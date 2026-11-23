@@ -541,4 +541,23 @@ ok('49. 御家人への指図：承知・遅参・断りは忠誠などで決ま
   assert(yes > 0 && no > 0, '承知も断りもある ' + yes + '/' + no); assert(kept > 0, '指図された軍は山木館を目指す');
   const s = izuStart(3); assert(!E.issueCommand(s, { type: 'vassal_order', faction: 'yoritomo', vassal: 'heike', act: 'attack', target: 'yamaki' }).ok, '従っていない勢力には頼めない');
 });
+
+ok('50. 退却命令：行軍中の軍は館へ退いて武士団に戻り、交戦中の軍は追撃で兵を失って退く', () => {
+  const s = izuStart(4); const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu');
+  E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, call: false });
+  let a = Object.values(s.armies).find(x => x.faction === 'yoritomo');
+  for (let d = 0; d < 20 && !a.battleId; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); a = s.armies[a.id]; if (!a) break; }
+  if (a && a.battleId) { const t0 = a.troops, r = E.issueCommand(s, { type: 'withdraw', faction: 'yoritomo', army: a.id }); assert(r.ok, r.reason); assert(/追撃/.test(r.message)); assert(!s.armies[a.id] || s.armies[a.id].troops < t0, '兵を失う'); assert(!s.pendingStops.some(e => e.key === 'attack_failed' && !e.resolved), '自ら引いたときは失敗の問いを出さない'); }
+  assert(!E.issueCommand(s, { type: 'withdraw', faction: 'yoritomo', army: 'nope' }).ok);
+  const s2 = izuStart(5); const iz2 = E.sortieSources(s2, 'yoritomo').find(x => x.province === 'izu');
+  E.issueCommand(s2, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz2.available }, declare: true, call: false });
+  const b = Object.values(s2.armies).find(x => x.faction === 'yoritomo'); const r2 = E.issueCommand(s2, { type: 'withdraw', faction: 'yoritomo', army: b.id }); assert(r2.ok, r2.reason); assert(!s2.armies[b.id], '館のある国なら、そのまま館に戻る');
+});
+ok('51. 主従の義理：主君が健在で関係が悪くなければ、御家人は他の陣営へ鞍替えしない（大軍に圧倒されたときの帰順は別）', () => {
+  let flips = 0;
+  for (let seed = 1; seed <= 6; seed++) { const s = izuStart(seed); s.factions.miura.overlord = 'yoritomo'; s.factions.miura.pledgedDay = -1000; E.getRel ? 0 : 0;
+    s.factions.kai.status = '挙兵'; for (let d = 0; d < 200; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); if (s.flags.gameOver) break; }
+    if (s.factions.miura.overlord && s.factions.miura.overlord !== 'yoritomo') flips++; }
+  assert.strictEqual(flips, 0, '三浦氏は甲斐源氏などへ鞍替えしない');
+});
 console.log(`\n${n} 件の受入条件をすべて満たした`);

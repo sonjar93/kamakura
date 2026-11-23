@@ -93,9 +93,9 @@ select,input,textarea{font:inherit;border:1px solid var(--line);border-radius:6p
 #ticker div.new{animation:fadein .35s}
 #ticker div.old{opacity:0}
 @keyframes fadein{from{opacity:0;transform:translateY(4px)}}
-#toast{position:fixed;left:50%;top:60px;transform:translateX(-50%);z-index:40;display:none;max-width:min(460px,80%);background:#fff;border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:8px;padding:8px 12px;box-shadow:var(--shadow)}
+#toast{position:fixed;left:calc(50% + 175px);top:60px;transform:translateX(-50%);z-index:40;pointer-events:none;display:none;max-width:min(460px,80%);background:#fff;border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:8px;padding:8px 12px;box-shadow:var(--shadow)}
 #toast.ng{border-left-color:var(--ng)}
-#hint{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--accent);color:#fff;padding:7px 14px;border-radius:18px;display:none;box-shadow:var(--shadow);z-index:5;font-size:13px}
+#hint{pointer-events:none;position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--accent);color:#fff;padding:7px 14px;border-radius:18px;display:none;box-shadow:var(--shadow);z-index:5;font-size:13px}
 #hover{position:absolute;pointer-events:none;background:rgba(31,26,20,.92);color:#fff;padding:5px 8px;border-radius:6px;font-size:12px;display:none;z-index:6;white-space:nowrap}
 #pop{position:absolute;z-index:6;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;min-width:230px;max-width:320px;display:none}
 #pop h4{margin:0 0 4px;font-family:"Shippori Mincho",serif;font-size:15px}
@@ -147,6 +147,8 @@ select,input,textarea{font:inherit;border:1px solid var(--line);border-radius:6p
   #ticker{display:none}
   #top .title{display:none}#date{font-size:15px}
 }
+@media (max-width:900px){#toast{left:50%}}
+#left .tabs button{touch-action:manipulation}
 </style>
 </head>
 <body>
@@ -207,11 +209,7 @@ select,input,textarea{font:inherit;border:1px solid var(--line);border-radius:6p
         <div><span class="lg" style="border-top:3px solid #8a6d3b;height:0"></span>街道　<span class="lg" style="border-top:3px solid #2f5f86;height:0"></span>海路</div>
       </div>
       <div id="zoom"><button id="zin" title="拡大">＋</button><button id="zout" title="縮小">－</button><button id="zfit" title="全体">⤢</button><button id="zhome" title="畿内〜関東">⌂</button></div>
-      <div id="toolbar">
-        <button data-act="muster">⚔ 出陣</button><button data-act="recruit">👥 徴兵</button><button data-act="build">🏯 普請</button><button data-act="diplomacy">📜 使者</button>
-        <button data-act="court">⛩ 朝廷</button><button data-act="bakufu">🏛 幕府</button><button data-act="faction">🌾 兵糧・寄進</button><button data-act="history">📖 史実</button>
-        <button data-act="uprise" class="red" id="tbUprise" style="display:none">挙兵</button>
-      </div>
+
       <div id="ticker"></div>
       <div id="toast"></div><div id="hint"></div><div id="hover"></div><div id="pop"></div>
     </div>
@@ -350,7 +348,7 @@ function newGame(fid){
   var goal=(document.querySelector('input[name=goal]:checked')||{}).value||'objective';
   S=E.createGame(SCN,{playerFaction:fid,seed:+$('seed').value||1180,mode:mode,difficulty:dif,goal:goal});
   seenLog=S.log.length; $('start').classList.remove('on'); setSpeed(0); home(); sel=null; command=null; render();
-  toast('マップの自軍をクリックして選び、行き先をクリックすると進軍できます。下のツールバーから出陣・普請などを行えます。', true, 7000);
+  toast('マップの自軍をクリックして選び、行き先をクリックすると進軍できます。出陣・徴兵は左の「軍勢」タブ、普請・外交などは各タブから。スペースキーで時間を進める／止める。', true, 7000);
 }
 $('newBtn').onclick=function(){ setSpeed(0); startScreen(); };
 $('loadFromStart').onclick=function(){ $('start').classList.remove('on'); $('savemodal').classList.add('on'); };
@@ -608,7 +606,7 @@ function render(fromTick){
   $('date').textContent=U.dateStr(S);
   var pf=myF();
   $('pf').innerHTML=(S.options.mode==='historical'?'<span class="chip gold">史実モード</span> ':'<span class="chip">自由モード</span> ')+'<span class="chip">'+esc((E.DIFFICULTY[S.options.difficulty||'normal']||{}).label||'')+'</span> '+(pf?fsw(pf.id)+esc(pf.name)+(S.player&&S.player.person&&S.persons[S.player.person]?' <span class="chip" title="操作人物">👤 '+esc(pnm(S.player.person))+(S.player.status&&S.player.status!=='在任'?'（'+esc(S.player.status)+'）':'')+'</span>':''):'観戦');
-  $('tbUprise').style.display=pf&&['雌伏','密謀'].indexOf(pf.status)>=0&&['yoritomo','kiso','kai'].indexOf(pf.id)>=0?'':'none';
+  if($('tbUprise')) $('tbUprise').style.display=pf&&['雌伏','密謀'].indexOf(pf.status)>=0&&['yoritomo','kiso','kai'].indexOf(pf.id)>=0?'':'none';
   renderMap(); renderLeft(fromTick); if($('right').classList.contains('open')) renderRight(); ticker();
   if(sel&&sel.type==='army'&&!S.armies[sel.id]){ sel=null; hidePop(); }
 }
@@ -704,13 +702,16 @@ function armyPop(aid,e){
   if(mineA){ var fd=ids.reduce(function(t,x){return t+S.armies[x].food;},0), nd=Math.max(0.01,tot*0.005), sup=E.supplyAt(S,a.faction,a.province);
     h+='<div class="small" style="margin-top:4px">兵糧 <b>'+fmt(fd)+'</b>石（約'+Math.floor(fd/nd)+'日分）　'+(sup!=null?'<span class="ok">補給線あり</span>（拠点から'+Math.round(sup)+'km）':'<span class="ng">補給線なし</span>：現地調達のみ。尽きると逃亡が出て、6日続けば退く')+'</div>'; }
   h+='<div class="small muted" style="margin-top:4px">そのまま地図の行き先をクリックすると'+(cp?'<b>軍団全体（'+corpsCount+'隊）</b>':'この軍勢')+'が進みます</div>';
-  h+='<div class="acts">'+(cp?'<label class="small"><input type="checkbox" id="pWhole" checked> 軍団全体で動かす</label>':'')+'<button class="btn sm" id="pOrg">編成</button><button class="btn sub sm" id="pDis">解散</button>'+(cp?'<button class="btn sub sm" id="pReinf">後詰めを送る</button>':'')+'</div>';
+  h+='<div class="acts">'+(cp?'<label class="small"><input type="checkbox" id="pWhole" checked> 軍団全体で動かす</label>':'')+(a.faction===S.playerFaction&&a.status!=='retreating'?'<button class="btn red sm" id="pWd" title="行軍中・交戦中の兵を引かせる。交戦中に引くと追撃で兵を失う">退却</button>':'')+'<button class="btn sm" id="pOrg">編成</button><button class="btn sub sm" id="pDis">解散</button>'+(cp?'<button class="btn sub sm" id="pReinf">後詰めを送る</button>':'')+'</div>';
   showPop(h,e);
   command.whole=!!cp;
   if($('pWhole')) $('pWhole').onchange=function(){ command&&(command.whole=this.checked); };
   [].forEach.call(document.querySelectorAll('[data-pick]'),function(b){ b.onclick=function(){ sel={type:'army',id:b.dataset.pick}; beginMove(b.dataset.pick); command.whole=false; hidePop(); renderDynamic(); toast('「'+pnm(S.armies[b.dataset.pick].commander)+'」の部隊だけを動かします。行き先をクリック',true); }; });
   $('pOrg').onclick=function(){ hidePop(); cancelCommand(); openOrg({army:aid}); };
   $('pDis').onclick=function(){ hidePop(); cancelCommand(); run({type:'disband',army:aid}); };
+  if($('pWd')) $('pWd').onclick=function(){ var whole=$('pWhole')&&$('pWhole').checked&&a.corps, ids2=whole?Object.keys(S.armies).filter(function(k){return S.armies[k].corps===a.corps&&S.armies[k].faction===S.playerFaction;}):[aid];
+    if(S.armies[aid]&&S.armies[aid].battleId&&!confirm('交戦中の退却は追撃を受けて兵を失います。退却させますか？')) return;
+    hidePop(); cancelCommand(); var last=null; ids2.forEach(function(k){ if(S.armies[k]) last=run({type:'withdraw',army:k}); }); };
   if($('pReinf')) $('pReinf').onclick=function(){ hidePop(); cancelCommand(); openSortie({join:a.corps}); };
   if($('pSplit')) $('pSplit').onclick=function(){ var gs={}; [].forEach.call(document.querySelectorAll('[data-sg]'),function(el){ var g=el.value; (gs[g]=gs[g]||[]).push(el.getAttribute('data-sg')); });
     var groups=Object.keys(gs).sort().map(function(g){ return {armies:gs[g],route:(document.querySelector('[data-sr="'+g+'"]')||{}).value||'auto'}; }); hidePop(); cancelCommand(); run({type:'split_corps',corps:a.corps,groups:groups}); };
@@ -1008,7 +1009,7 @@ function run(cmd){ cmd.faction=S.playerFaction; var r=E.issueCommand(S,cmd); toa
 var toastT=null;
 function toast(t,ok,ms){ var el=$('toast'); el.textContent=t; el.className=ok?'':'ng'; el.style.display='block'; clearTimeout(toastT); toastT=setTimeout(function(){el.style.display='none';},ms||(ok?4500:6500)); }
 $('helpBtn').onclick=function(){ $('help').classList.add('on'); };
-[].forEach.call(document.querySelectorAll('#toolbar button'),function(b){ b.onclick=function(){
+[].forEach.call(document.querySelectorAll('[data-act]'),function(b){ b.onclick=function(){
   var act=b.dataset.act;
   if(act==='history'){ ltab='history'; openLeft(); renderLeft(); return; }
   if(!S||!S.playerFaction){ toast('✗ 観戦モードでは命令できない',false); return; }
@@ -1019,7 +1020,7 @@ $('helpBtn').onclick=function(){ $('help').classList.add('on'); };
 }; });
 
 // ================================================================ 左パネル
-[].forEach.call(document.querySelectorAll('#ltabs button'),function(b){ b.onclick=function(){ ltab=b.dataset.t; renderLeft(); }; });
+[].forEach.call(document.querySelectorAll('#ltabs button'),function(b){ var go=function(e){ if(e&&e.button>0) return; if(ltab===b.dataset.t&&e&&e.type==='click') return; ltab=b.dataset.t; renderLeft(); $('lbody').scrollTop=0; }; b.addEventListener('pointerdown',go); b.onclick=go; });
 function setTabs(id,cur){ [].forEach.call(document.querySelectorAll('#'+id+' button'),function(b){ b.classList.toggle('on',b.dataset.t===cur); }); }
 function statusJa(s){ return {idle:'待機',marching:'行軍中',gathering:'集結中',battle:'交戦中',siege:'攻囲中',retreating:'退却中',arrived:'到着'}[s]||s; }
 function campOf(fid){ return U.topLord(S,fid); }
@@ -1144,12 +1145,12 @@ TABS.faction=function(f,fid){
 TABS.armies=function(f,fid){
   if(!f) return '<div class="card muted">観戦モード</div>';
   var my=Object.keys(S.armies).filter(function(k){return S.armies[k].faction===fid;});
-  var h='<div class="card"><div class="row"><button class="btn red" data-act2="muster">⚔ 出陣の編成</button></div><div class="small muted">地図の自軍をクリックして選び、行き先をクリックすると進軍します（勝算が表示されます）。</div></div>';
+  var h='<div class="card"><div class="row"><button class="btn red" data-act2="muster">⚔ 出陣の編成</button><button class="btn" data-act2="recruit">👥 徴兵</button>'+(['雌伏','密謀'].indexOf(f.status)>=0&&['yoritomo','kiso','kai'].indexOf(fid)>=0?'<button class="btn red" data-act2="uprise">挙兵する</button>':'')+'</div><div class="small muted">地図の自軍をクリックして選び、行き先をクリックすると進軍します（勝算が表示されます）。</div></div>';
   h+=my.map(function(k){ var a=S.armies[k], q=E.armyQuality(S,a);
     return '<div class="card"><h3>'+esc(U.armyLabel(S,a))+' <span class="chip">'+statusJa(a.status)+'</span></h3><div class="small">'+esc(S.provinces[a.province].name)+(a.target?' → '+esc(a.target.type==='base'?S.bases[a.target.id].name:S.provinces[a.target.id].name):'')+'　士気'+Math.round(a.morale)+'　疲労'+Math.round(a.fatigue)+'　兵糧'+Math.floor(a.food/Math.max(1,a.troops*0.005))+'日分</div>'+
       '<table class="t" style="margin-top:4px"><tr><th>役</th><th>武将</th><th class="num">兵</th></tr>'+a.divisions.map(function(d){return '<tr><td>'+(d.main?'総大将（本隊）':'部隊大将')+'</td><td>'+esc(pnm(d.leader))+'</td><td class="num">'+fmt(d.troops)+'</td></tr>';}).join('')+'<tr><td>軍奉行</td><td>'+esc(a.bugyo?pnm(a.bugyo):'なし')+'</td><td></td></tr></table>'+
       '<div class="small muted">軍の質 '+Math.round(q.factor*100)+(q.notes.length?'：'+esc(q.notes.join('・')):'')+'</div>'+
-      '<div class="row"><button class="btn sm" data-move="'+k+'">進軍</button><button class="btn sub sm" data-org="'+k+'">編成</button><button class="btn sub sm" data-look="'+k+'">地図で見る</button><button class="btn sub sm" data-disband="'+k+'">解散</button></div></div>'; }).join('');
+      '<div class="row"><button class="btn sm" data-move="'+k+'">進軍</button><button class="btn sub sm" data-org="'+k+'">編成</button><button class="btn sub sm" data-look="'+k+'">地図で見る</button><button class="btn sub sm" data-disband="'+k+'">解散</button>'+(S.armies[k].status!=='retreating'?'<button class="btn red sm" data-wd="'+k+'">退却</button>':'')+'</div></div>'; }).join('');
   return h;
 };
 TABS.persons=function(f,fid){
@@ -1356,11 +1357,12 @@ function bindLeft(){
   if(q('hfSel')) q('hfSel').onchange=function(){ window._hf=q('hfSel').value; renderLeft(); };
   if(q('bBuild')) q('bBuild').onclick=function(){ command={kind:'build',scale:q('bdS').value,name:q('bdN').value}; svg.classList.add('targeting'); hint('建設地をクリック（右クリック／Escで取消）'); if(window.innerWidth<820) $('left').classList.add('closed'); };
   [].forEach.call(document.querySelectorAll('[data-inst]'),function(b){ b.onclick=function(){ var hd=document.querySelector('[data-ihead="'+b.dataset.inst+'"]'); run({type:'establish',inst:b.dataset.inst,head:hd&&hd.value||null}); }; });
-  [].forEach.call(document.querySelectorAll('[data-act2]'),function(b){ b.onclick=function(){ if(b.dataset.act2==='uprise') run({type:'uprising'}); else openSortie({}); }; });
+  [].forEach.call(document.querySelectorAll('[data-act2]'),function(b){ b.onclick=function(){ if(b.dataset.act2==='uprise') run({type:'uprising'}); else if(b.dataset.act2==='recruit') openRecruit(null); else openSortie({}); }; });
   [].forEach.call(document.querySelectorAll('[data-move]'),function(b){ b.onclick=function(){ sel={type:'army',id:b.dataset.move}; beginMove(b.dataset.move); lookAt(S.armies[b.dataset.move]); render(); }; });
   [].forEach.call(document.querySelectorAll('[data-org]'),function(b){ b.onclick=function(){ openOrg({army:b.dataset.org}); }; });
   [].forEach.call(document.querySelectorAll('[data-look]'),function(b){ b.onclick=function(){ sel={type:'army',id:b.dataset.look}; lookAt(S.armies[b.dataset.look]); render(); }; });
   [].forEach.call(document.querySelectorAll('[data-disband]'),function(b){ b.onclick=function(){ run({type:'disband',army:b.dataset.disband}); }; });
+  [].forEach.call(document.querySelectorAll('[data-wd]'),function(b){ b.onclick=function(){ var k=b.dataset.wd; if(S.armies[k]&&S.armies[k].battleId&&!confirm('交戦中の退却は追撃を受けて兵を失います。退却させますか？')) return; run({type:'withdraw',army:k}); }; });
   [].forEach.call(document.querySelectorAll('[data-cancelb]'),function(b){ b.onclick=function(){ run({type:'cancel_build',id:b.dataset.cancelb}); }; });
   [].forEach.call(document.querySelectorAll('[data-goto]'),function(b){ b.onclick=function(){ var v=b.dataset.goto.split(','); centerOn(+v[0],+v[1],140); }; });
 }
