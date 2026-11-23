@@ -1,0 +1,228 @@
+{
+ "heike": {
+  "title": "平家政権の存続",
+  "text": "建久元年（1190）まで都と朝廷の主導権を保ち、畿内を押さえ続ける",
+  "conds": [
+   {
+    "t": "courtControl",
+    "label": "朝廷の主導権を握る"
+   },
+   {
+    "t": "provinces",
+    "list": [
+     "yamashiro",
+     "settsu"
+    ],
+    "n": 2,
+    "label": "山城・摂津を押さえる"
+   },
+   {
+    "t": "date",
+    "y": 1190,
+    "m": 4,
+    "label": "建久元年（1190）4月を迎える"
+   }
+  ]
+ },
+ "yoritomo": {
+  "title": "武家政権の樹立",
+  "text": "東国の武士団を束ね、幕府と三つの機関を置き、朝廷に認めさせる",
+  "conds": [
+   {
+    "t": "bakufu",
+    "label": "幕府を開く（鎌倉に本拠）"
+   },
+   {
+    "t": "institutions",
+    "list": [
+     "samurai_dokoro",
+     "kumonjo",
+     "monchujo"
+    ],
+    "label": "侍所・公文所・問注所を置く"
+   },
+   {
+    "t": "provinces",
+    "list": [
+     "izu",
+     "sagami",
+     "musashi",
+     "awa_t",
+     "kazusa",
+     "shimosa",
+     "hitachi",
+     "kozuke",
+     "shimotsuke"
+    ],
+    "n": 7,
+    "label": "東国9か国のうち7か国を押さえる"
+   },
+   {
+    "t": "anyOf",
+    "label": "朝廷に認められる（征夷大将軍に任じられる、または朝廷の支持が+15以上）",
+    "list": [
+     {
+      "t": "office",
+      "list": [
+       "征夷大将軍"
+      ]
+     },
+     {
+      "t": "support",
+      "min": 0.15
+     }
+    ]
+   }
+  ]
+ },
+ "kiso": {
+  "title": "入京と朝廷での地位",
+  "text": "平家を都から追い、入京して官職を得る",
+  "conds": [
+   {
+    "t": "notController",
+    "f": "heike",
+    "label": "平家が朝廷の主導権を失う"
+   },
+   {
+    "t": "provinces",
+    "list": [
+     "yamashiro"
+    ],
+    "n": 1,
+    "label": "山城（京）を押さえる"
+   },
+   {
+    "t": "office",
+    "list": [
+     "国守",
+     "征夷大将軍",
+     "検非違使別当"
+    ],
+    "label": "一門の誰かが官職（国守・征夷大将軍など）を得る"
+   }
+  ]
+ },
+ "mochihito": {
+  "title": "平家打倒の令旨を果たす",
+  "text": "平家を朝廷から退け、家を保つ",
+  "conds": [
+   {
+    "t": "notController",
+    "f": "heike",
+    "label": "平家が朝廷の主導権を失う"
+   },
+   {
+    "t": "minBases",
+    "n": 1,
+    "label": "拠点を一つ以上保つ"
+   }
+  ]
+ },
+ "kai": {
+  "title": "甲斐源氏の自立",
+  "text": "誰にも従わず、甲斐・駿河・遠江を押さえて寿永末を越える",
+  "conds": [
+   {
+    "t": "notVassal",
+    "label": "他家に従属しない"
+   },
+   {
+    "t": "provinces",
+    "list": [
+     "kai",
+     "suruga",
+     "totomi"
+    ],
+    "n": 3,
+    "label": "甲斐・駿河・遠江を押さえる"
+   },
+   {
+    "t": "date",
+    "y": 1185,
+    "m": 1,
+    "label": "元暦2年（1185）を迎える"
+   }
+  ]
+ },
+ "oshu": {
+  "title": "奥州の独立と富",
+  "text": "中央の争乱に巻き込まれず、平泉の繁栄を保つ",
+  "conds": [
+   {
+    "t": "notVassal",
+    "label": "他家に従属しない"
+   },
+   {
+    "t": "holdBase",
+    "base": "hiraizumi",
+    "label": "平泉を保つ"
+   },
+   {
+    "t": "money",
+    "min": 8000,
+    "label": "銭8,000貫を蓄える"
+   },
+   {
+    "t": "date",
+    "y": 1190,
+    "m": 4,
+    "label": "建久元年（1190）4月を迎える"
+   }
+  ]
+ },
+ "miura": {
+  "title": "三浦一族の繁栄",
+  "text": "衣笠城と相模を保ち、建久元年を迎える",
+  "conds": [
+   {
+    "t": "holdBase",
+    "base": "kinugasa",
+    "label": "衣笠城を保つ"
+   },
+   {
+    "t": "provinces",
+    "list": [
+     "sagami"
+    ],
+    "n": 1,
+    "label": "相模を押さえる（主家の下でもよい）",
+    "camp": true
+   },
+   {
+    "t": "date",
+    "y": 1190,
+    "m": 4,
+    "label": "建久元年（1190）4月を迎える"
+   }
+  ]
+ },
+ "kazusa": {
+  "title": "房総の覇者",
+  "text": "上総・下総・安房を押さえ、建久元年を迎える",
+  "conds": [
+   {
+    "t": "holdBase",
+    "base": "kazusa_yakata",
+    "label": "上総の館を保つ"
+   },
+   {
+    "t": "provinces",
+    "list": [
+     "kazusa",
+     "shimosa",
+     "awa_t"
+    ],
+    "n": 3,
+    "label": "上総・下総・安房を押さえる（主家の下でもよい）",
+    "camp": true
+   },
+   {
+    "t": "date",
+    "y": 1190,
+    "m": 4,
+    "label": "建久元年（1190）4月を迎える"
+   }
+  ]
+ }
+}
