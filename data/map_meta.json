@@ -1,0 +1,177 @@
+{
+ "provinceOrder": [
+  "yamashiro",
+  "yamato",
+  "kawachi",
+  "izumi",
+  "settsu",
+  "iga",
+  "ise",
+  "shima",
+  "owari",
+  "mikawa",
+  "totomi",
+  "suruga",
+  "izu",
+  "kai",
+  "sagami",
+  "musashi",
+  "awa_t",
+  "kazusa",
+  "shimosa",
+  "hitachi",
+  "omi",
+  "mino",
+  "hida",
+  "shinano",
+  "kozuke",
+  "shimotsuke",
+  "mutsu",
+  "dewa",
+  "wakasa",
+  "echizen",
+  "kaga",
+  "noto",
+  "etchu",
+  "echigo",
+  "sado",
+  "tamba",
+  "tango",
+  "tajima",
+  "inaba",
+  "hoki",
+  "izumo",
+  "iwami",
+  "oki",
+  "harima",
+  "mimasaka",
+  "bizen",
+  "bitchu",
+  "bingo",
+  "aki",
+  "suo",
+  "nagato",
+  "kii",
+  "awaji",
+  "awa_n",
+  "sanuki",
+  "iyo",
+  "tosa",
+  "chikuzen",
+  "chikugo",
+  "buzen",
+  "bungo",
+  "hizen",
+  "higo",
+  "hyuga",
+  "osumi",
+  "satsuma",
+  "iki",
+  "tsushima"
+ ],
+ "ll2xy": {
+  "bx": [
+   -4483.2390524191815,
+   8.975359268464759,
+   -98.60534644671692,
+   0.09632746927383286,
+   -1.8183089160064239,
+   1.6583172854528394
+  ],
+  "by": [
+   14206.283812380916,
+   -136.27619836697318,
+   -108.49000645575107,
+   0.2943731027867693,
+   -3.011723493233478,
+   1.5109075120487838
+  ],
+  "terms": "1,lon,lat,lon^2,lat^2,lon*lat"
+ },
+ "capes": [
+  {
+   "name": "潮岬",
+   "lat": 33.43,
+   "lon": 135.76,
+   "x": 712.3,
+   "y": 995.5
+  },
+  {
+   "name": "室戸岬",
+   "lat": 33.25,
+   "lon": 134.18,
+   "x": 563.8,
+   "y": 1016.4
+  },
+  {
+   "name": "佐多岬",
+   "lat": 30.99,
+   "lon": 130.66,
+   "x": 248.0,
+   "y": 1291.4
+  },
+  {
+   "name": "野島崎",
+   "lat": 34.9,
+   "lon": 139.89,
+   "x": 1097.2,
+   "y": 828.8
+  },
+  {
+   "name": "犬吠埼",
+   "lat": 35.7,
+   "lon": 140.87,
+   "x": 1195.7,
+   "y": 731.0
+  },
+  {
+   "name": "石廊崎",
+   "lat": 34.6,
+   "lon": 138.84,
+   "x": 1003.2,
+   "y": 863.5
+  },
+  {
+   "name": "御前崎",
+   "lat": 34.6,
+   "lon": 138.22,
+   "x": 931.7,
+   "y": 859.1
+  },
+  {
+   "name": "禄剛埼",
+   "lat": 37.53,
+   "lon": 137.33,
+   "x": 854.7,
+   "y": 519.2
+  },
+  {
+   "name": "魹ヶ埼",
+   "lat": 39.55,
+   "lon": 142.07,
+   "x": 1310.1,
+   "y": 276.1
+  },
+  {
+   "name": "大王崎",
+   "lat": 34.28,
+   "lon": 136.9,
+   "x": 812.9,
+   "y": 903.1
+  },
+  {
+   "name": "野母崎",
+   "lat": 32.58,
+   "lon": 129.75,
+   "x": 169.4,
+   "y": 1136.3
+  },
+  {
+   "name": "龍飛崎",
+   "lat": 41.25,
+   "lon": 140.35,
+   "x": 1112.1,
+   "y": 24.8
+  }
+ ]
+}
