@@ -17,7 +17,7 @@
   else root.GenpeiEngine = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var ENGINE_VERSION = '0.15.0';
+  var ENGINE_VERSION = '0.16.0';
 
   // ================================================================ 乱数（シード固定・状態に保存）
   function rand(s) {
@@ -309,6 +309,7 @@
     if (!path) return '経路が見つからない';
     a.target = target; a.mission = mission || 'move'; a.path = path.slice(1); a.edge = null; a.base = null;
     if (a.status !== 'gathering' && a.status !== 'battle') a.status = a.path.length ? 'marching' : 'arrived';
+    if (a.status === 'arrived' && a.mission === 'attack' && target.type === 'base') arrive(s, a); // 同じ国の拠点はそのまま攻めかかる
     return null;
   }
   function mobilize(s, fid, pid, troops, commander, opts) {
@@ -377,7 +378,7 @@
     runAI(s);                  // AI勢力
     checkEvents(s);            // 歴史イベント
     cleanup(s);
-    syncSeatHoldings(s); facilitiesTick(s); contingentsTick(s);
+    syncSeatHoldings(s); facilitiesTick(s); contingentsTick(s); lordOrderTick(s);
     politicsDaily(s);
     checkVictory(s);           // 天下統一と5年の維持
     var newStops = s.pendingStops.slice(before);
@@ -423,6 +424,14 @@
   function moveArmies(s) {
     Object.keys(s.armies).forEach(function (k) {
       var a = s.armies[k];
+      if (a.faction === s.playerFaction) { // 命令のないまま留まる自軍は、しばらくすると館に戻る（出陣したまま放置されるのを防ぐ）
+        if (a.regroup && (a.status === 'idle' || a.status === 'arrived') && a.morale >= 55) { var rb = B(s, a.regroup); a.regroup = null; a.holdUntil = null; if (rb && rb.owner && !sameCamp(s, rb.owner, a.faction)) { news(s, armyLabel(s, a) + 'は士気を取り戻し、' + rb.name + 'へ再び攻めかかる', { type: 'military', factions: [a.faction] }); setArmyTarget(s, a, { type: 'base', id: rb.id }, 'attack'); return; } }
+        if ((a.status === 'idle' || a.status === 'arrived') && !(a.holdUntil > s.day)) a.idleDays = (a.idleDays || 0) + 1; else a.idleDays = 0;
+        var ownB = Object.keys(s.bases).some(function (b) { return s.bases[b].province === a.province && sameCamp(s, s.bases[b].owner, a.faction); });
+        if (a.idleDays >= 20 && ownB && !(a.corps && s.corps[a.corps] && s.corps[a.corps].target && s.corps[a.corps].target.type === 'base' && !sameCamp(s, B(s, s.corps[a.corps].target.id).owner, a.faction) && Object.keys(s.armies).some(function (o) { var x = s.armies[o]; return x.corps === a.corps && x.status !== 'idle' && x.status !== 'arrived'; }))) {
+          news(s, armyLabel(s, a) + 'は命令のないまま20日が過ぎたため、' + PV(s, a.province).name + 'の館に戻って兵を休ませた（武士団に戻り、再び出陣できる）', { type: 'military', important: true, factions: [a.faction], province: a.province });
+          disbandArmy(s, a, 'garrison'); return; }
+      }
       if (a.status === 'gathering') { if (s.day >= a.gatherUntil) { a.status = a.path.length ? 'marching' : 'idle'; if (!a.path.length && a.target && a.target.type === 'base' && B(s, a.target.id) && B(s, a.target.id).province === a.province) arrive(s, a); /* 同じ国の拠点はそのまま攻める */ news(s, armyLabel(s, a) + 'の動員が完了（' + PV(s, a.province).name + '）', { type: 'military', factions: [a.faction], province: a.province }); } return; }
       if (a.status !== 'marching' && a.status !== 'retreating') { a.fatigue = Math.max(0, a.fatigue - 6); a.idleDays += 1; return; }
       a.idleDays = 0;
@@ -789,6 +798,11 @@
     // 敗軍は退却、勝軍は待機
     loseIds.forEach(function (id) { var a = s.armies[id]; if (!a) return; a.battleId = null; a.morale = Math.max(a.morale, 15); retreat(s, a); });
     winIds.forEach(function (id) { var a = s.armies[id]; if (!a) return; a.battleId = null; a.status = 'idle'; a.morale = clamp(a.morale + 10, 0, 95); });
+    if (bt.base && winner === 'def' && s.playerFaction) { var mineL = loseIds.map(function (id) { return s.armies[id]; }).filter(function (a) { return a && a.faction === s.playerFaction; });
+      if (mineL.length) { var bb = B(s, bt.base), rest = mineL.reduce(function (t, a) { return t + a.troops; }, 0);
+        stop(s, { key: 'attack_failed', base: bt.base, armies: mineL.map(function (a) { return a.id; }), title: bb.name + 'の攻撃は失敗した', persons: mineL.map(function (a) { return a.commander; }).filter(Boolean),
+          text: bb.name + 'を落とせず、味方は退いた（残る兵 約' + Math.round(rest) + '、士気は落ちている）。\n兵をどうするか決める。何もしなければ、退いた先でしばらく待機したのち館に戻る。',
+          choices: [{ id: 'return', label: '館に戻して兵を休める（武士団に戻し、また出陣できる）' }, { id: 'retry', label: '兵を立て直して、もう一度攻める' }, { id: 'stay', label: 'その場で待機する' }] }); } }
     var capturedBase = null;
     if (bt.base && winner === 'att') {
       var b = B(s, bt.base), old = b.owner; capturedBase = b;
@@ -1244,6 +1258,49 @@
     }
     return tp;
   }
+
+  // ---- 御家人・家への指図（出陣・守り・合流の要請）。家臣ではないので、受けるかどうかは相手が決める
+  function orderRetainer(s, fid, cmd) {
+    var f = F(s, fid), r = retainersOf(s, fid).filter(function (x) { return x.id === cmd.vassal; })[0]; if (!r) return { ok: false, reason: '自分に従う家・御家人ではない' };
+    var name = retName(s, r), act = cmd.act, target = null, cp = null, lead = null;
+    if (act === 'join') { cp = s.corps[cmd.corps]; if (!cp || cp.faction !== fid) return { ok: false, reason: '合流先の軍団を選ぶこと' }; target = cp.target;
+      lead = Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return a.corps === cp.id && !a.joinCorps; }).sort(function (a, b) { return b.troops - a.troops; })[0]; if (!lead) return { ok: false, reason: 'その軍団には本隊がいない' }; }
+    else if (act === 'attack' || act === 'defend') { if (!cmd.target || !B(s, cmd.target)) return { ok: false, reason: '拠点を選ぶこと' }; target = { type: 'base', id: cmd.target }; var bo = B(s, cmd.target).owner;
+      if (act === 'attack' && (!bo || sameCamp(s, bo, fid))) return { ok: false, reason: '敵の拠点を選ぶこと' }; if (act === 'attack' && !atWar(s, fid, bo)) return { ok: false, reason: fname(s, bo) + 'とは交戦していない' };
+      if (act === 'defend' && !sameCamp(s, bo, fid)) return { ok: false, reason: '味方の拠点を選ぶこと' }; }
+    else return { ok: false, reason: '指図の種類が不明' };
+    s.orderCool = s.orderCool || {}; var ck = fid + '>' + r.id; if (s.orderCool[ck] != null && s.day - s.orderCool[ck] < 20) return { ok: false, reason: name + 'には先日頼んだばかり（20日あける）' };
+    if (r.kind === 'vassal' && (F(s, r.id).flags || {}).strifeUntil > s.day) return { ok: false, reason: name + 'は家中が乱れていて動けない' };
+    var mineArm = function (a) { return r.kind === 'house' ? a.house === r.id : a.faction === r.id; };
+    if (Object.keys(s.armies).some(function (k) { var a = s.armies[k]; return mineArm(a) && ((a.lordOrder && a.lordOrder.lord === fid && a.lordOrder.until > s.day) || (a.joinCorps && a.contingentOf === fid)); })) return { ok: false, reason: name + 'の軍はすでに指図で出ている' };
+    s.orderCool[ck] = s.day;
+    var d = joinDecision(s, fid, r, target, 0.3), L = retLoyalty(s, r, fid), tp0 = target.type === 'base' ? B(s, target.id).province : target.id;
+    var kin0 = kinship(s, fid, r), cause0 = ((f.legitimacy || 0) - 40) / 4 + (f.flags.insen || f.flags.ryoji ? 6 : 0), threat0 = /本領に敵が迫る/.test(d.why) ? 10 : 0;
+    var sc = L * 0.75 + cause0 + (kin0 === 'blood' ? 20 : kin0 === 'inlaw' ? 10 : 0) - distProv(s, d.home, tp0) / 60 - threat0 + (act === 'defend' ? 12 : act === 'join' ? 4 : 0) + serviceOf(s, fid, r.id) * -1 + (rand(s) - 0.5) * 30; // 直接の頼みは主従の情（忠誠）で決まる
+    d.why = '忠誠' + Math.round(L) + (kin0 ? (kin0 === 'blood' ? '・一門' : '・縁戚') : '') + '・大義' + Math.round(cause0) + '・距離' + Math.round(distProv(s, d.home, tp0)) + 'km' + (threat0 ? '・本領に敵が迫る' : '') + (serviceOf(s, fid, r.id) > 2 ? '・恩賞が滞っている' : '') + '→' + Math.round(sc);
+    var dec = sc >= 35 ? 'join' : sc >= 22 ? 'late' : 'refuse';
+    if (r.kind === 'house') { var hh = H(s, r.id); hh.loyalty = clamp((hh.loyalty == null ? 50 : hh.loyalty) - 1, 0, 100); } else { var rv0 = rel(s, r.id, fid); rv0.value = clamp(rv0.value - 1, -100, 100); } // たびたびの使い立ては負担になる
+    if (dec === 'refuse' || d.avail < 20) { aiLog(s, fid, name + 'に指図（不承知）', d.why); return { ok: true, refused: true, message: name + 'は申し出を断った（' + (d.avail < 20 ? '出せる兵がない' : d.why) + '）' }; }
+    var field = r.kind === 'vassal' && act !== 'join' ? Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return a.faction === r.id && !a.joinCorps && !a.lordOrder && (a.status === 'idle' || a.status === 'arrived') && a.troops >= 50; }).sort(function (a, b) { return b.troops - a.troops; })[0] : null;
+    if (field) { var ef = setArmyTarget(s, field, target, act === 'attack' ? 'attack' : 'move'); if (!ef) { field.lordOrder = { lord: fid, act: act, target: target, until: s.day + 120 }; var fm = name + 'は出陣中の' + Math.round(field.troops) + 'を' + (act === 'attack' ? B(s, target.id).name + 'へ向けた' : B(s, target.id).name + 'の守りに回した');
+        news(s, '【指図】' + fm, { type: 'military', important: true, factions: [fid] }); aiLog(s, fid, name + 'に指図（承知）', d.why); return { ok: true, message: fm }; } }
+    var order = B(s, f.capital) ? travelDays(s, B(s, f.capital).province, d.home, 55) : 1, prep = dec === 'late' ? 7 + Math.round(rand(s) * 6) : 2 + Math.round(rand(s) * 2);
+    var n = Math.floor(d.avail * (dec === 'late' ? 0.6 : 0.85)), actor = r.kind === 'house' ? fid : r.id, cmdr = r.kind === 'house' ? (H(s, r.id).head && personFree(s, H(s, r.id).head, fid) ? H(s, r.id).head : null) : null;
+    var m = mobilize(s, actor, d.home, n, cmdr, { house: r.kind === 'house' ? r.id : null, gather: order + prep, foodDays: 40, force: true, allowNeighbors: false }); if (!m.army) return { ok: true, refused: true, message: name + 'は兵を集められなかった' };
+    var a = typeof m.army === 'string' ? s.armies[m.army] : m.army; a.house = r.kind === 'house' ? r.id : null; a.status = 'gathering'; a.gatherUntil = s.day + order + prep;
+    if (act === 'join') { a.joinCorps = cp.id; a.contingentOf = fid; var rvp = rendezvousFor(s, lead, d.home, target.type === 'base' ? B(s, target.id).province : target.id); setArmyTarget(s, a, { type: 'province', id: rvp }, 'move'); a.status = 'gathering';
+      cp.contingents = cp.contingents || []; cp.contingents.push({ id: r.id, kind: r.kind, name: name, decision: dec, why: d.why, troops: a.troops, army: a.id, rendezvous: rvp, eta: s.day + order + prep + travelDays(s, d.home, rvp, 25) }); }
+    else { a.lordOrder = { lord: fid, act: act, target: target, until: s.day + 120 }; var e = setArmyTarget(s, a, target, act === 'attack' ? 'attack' : 'move'); if (e) { disbandArmy(s, a, 'home'); return { ok: false, reason: e }; } a.status = 'gathering'; }
+    var msg = name + 'は' + (dec === 'late' ? '遅れて' : '') + a.troops + 'を率いて' + (act === 'join' ? pname(s, cp.commander) + 'の軍団に合流する' : act === 'attack' ? B(s, target.id).name + 'を攻める' : B(s, target.id).name + 'の守りにつく') + '（' + (a.gatherUntil - s.day) + '日後に発つ）';
+    news(s, '【指図】' + msg, { type: 'military', important: true, factions: [fid] }); aiLog(s, fid, name + 'に指図（承知）', d.why);
+    return { ok: true, message: msg };
+  }
+  function lordOrderTick(s) { // 指図を果たした・期限が来た軍は御家人の判断に戻る（功は奉公として記録）
+    Object.keys(s.armies).forEach(function (k) { var a = s.armies[k], o = a.lordOrder; if (!o) return; var b = o.target && o.target.type === 'base' ? B(s, o.target.id) : null;
+      var done = o.act === 'attack' && b && sameCamp(s, b.owner, o.lord);
+      if (done) { addService(s, o.lord, a.house || a.faction, 3); news(s, armyLabel(s, a) + 'は指図どおり' + b.name + 'の攻略を果たした（奉公が加わる）', { type: 'military', factions: [o.lord] }); }
+      if (done || o.until <= s.day || ((a.status === 'idle' || a.status === 'retreating') && o.act === 'attack' && a.morale < 30)) a.lordOrder = null; });
+  }
   function callToArms(s, fid, corpsId, lead) {
     var cp = s.corps[corpsId]; if (!cp || !lead) return [];
     var rs = retainersOf(s, fid).sort(function (a, b) { return retLoyalty(s, b, fid) - retLoyalty(s, a, fid); }), joined = 0, out = [], f = F(s, fid), cap = B(s, f.capital);
@@ -1282,7 +1339,7 @@
     Object.keys(s.armies).forEach(function (k) {
       var a = s.armies[k]; if (!a || !a.joinCorps) return; var cp = s.corps[a.joinCorps];
       var leads = Object.keys(s.armies).map(function (x) { return s.armies[x]; }).filter(function (x) { return x.corps === a.joinCorps && !x.joinCorps; });
-      if (!cp || !leads.length) { a.joinCorps = null; if (a.status === 'idle' || a.status === 'arrived') { disbandArmy(s, a, 'home'); } return; }
+      if (!cp || !leads.length) { a.joinCorps = null; if (a.status === 'idle' || a.status === 'arrived') { if (a.contingentOf === s.playerFaction) news(s, '【引き揚げ】' + armyLabel(s, a) + 'は合流先の本隊がすでに退いていたため、本領へ引き返した（自勢力タブの「指図」で、改めて出陣や合流を頼める）', { type: 'military', important: true, factions: [s.playerFaction] }); disbandArmy(s, a, 'home'); } return; }
       var lord = F(s, a.contingentOf), rec = (cp.contingents || []).filter(function (c) { return c.army === a.id; })[0], r = rec ? { kind: rec.kind, id: rec.id } : null;
       // 途中離脱：忠誠が低いか、本隊が負けて士気が落ちている
       var lowMor = leads.every(function (x) { return x.morale < 35; }), L = r ? retLoyalty(s, r, a.contingentOf) : 60;
@@ -3005,7 +3062,7 @@
     aiCourt(s, f);
     if (!f.alive) return;
     var enemies = enemiesOf(s, fid);
-    var myArmies = factionArmies(s, fid).filter(function (a) { return !a.joinCorps; }); // 参陣中の軍は主君の軍団に任せる
+    var myArmies = factionArmies(s, fid).filter(function (a) { return !a.joinCorps && !(a.lordOrder && a.lordOrder.until > s.day); }); // 参陣中・主君の指図で動く軍は任せる
     var capB = B(s, f.capital);
     // 1) 退却判断
     myArmies.forEach(function (a) {
@@ -3669,6 +3726,10 @@
     if (ev.choices && ev.choices.length && !ev.choices.some(function (c) { return c.id === choiceId; })) return { ok: false, reason: '選択肢が不正: ' + choiceId };
     ev.resolved = true; ev.choice = choiceId;
     var msg = '';
+    if (ev.key === 'attack_failed') { var arms0 = (ev.armies || []).map(function (id) { return s.armies[id]; }).filter(function (a) { return a && a.status !== 'battle'; });
+      if (choiceId === 'return') { arms0.forEach(function (a) { disbandArmy(s, a, 'garrison'); }); return { ok: true, message: '兵を館に戻した（' + arms0.length + '隊）' }; }
+      if (choiceId === 'retry') { arms0.forEach(function (a) { a.regroup = ev.base; a.holdUntil = s.day + 90; }); return { ok: true, message: arms0.length + '隊は兵を立て直し、士気が戻りしだい' + B(s, ev.base).name + 'を再び攻める' }; }
+      arms0.forEach(function (a) { a.holdUntil = s.day + 60; }); return { ok: true, message: 'その場で待機する' }; }
     if (ev.key === 'choose_person') return { ok: true, message: applySuccessor(s, choiceId, ev.reason) };
     if (ev.key === 'cabal_demand') { var cb = (s.politics.cabals || []).filter(function (x) { return x.id === ev.cabal; })[0]; if (!cb) return { ok: true, message: '反対派はすでに解けていた' };
       if (choiceId === 'accept') return { ok: true, message: compromise(s, cb) };
@@ -3784,6 +3845,7 @@
       case 'bakufu': return cmd.act === 'shikken' ? (function () { var st = shikkenStatus(s, cmd.faction); if (!st || !st.ok) return { ok: false, reason: '執権の条件がそろっていない' }; if (s.shogunate.shikken) return { ok: false, reason: 'すでに執権がいる（' + pName(s, s.shogunate.shikken.holder) + '）。まず退けること' }; return grantShikken(s, cmd.faction); })() : bkAct(s, cmd.faction, cmd.act, cmd.target, cmd);
       case 'reform': return startReform(s, cmd.faction, cmd.kind, cmd);
       case 'politics': return politicsAct(s, cmd.faction, cmd);
+      case 'vassal_order': return orderRetainer(s, cmd.faction, cmd);
       case 'appoint_office': return shikkenAppoint(s, cmd.faction, cmd);
       case 'build_facility': return buildFacility(s, cmd.faction, cmd);
       case 'split_corps': return splitCorps(s, cmd.faction, cmd);
@@ -3866,7 +3928,7 @@
       case 'court_gift': return '朝廷の派閥へ献金' + c.amount + '貫';
       case 'jito': return (s.holdings[c.holding] ? s.holdings[c.holding].name : '') + 'に地頭を置く';
       case 'regime': return (REGIME_ACTS[c.action] || {}).label || '体制の施策';
-      case 'bakufu': return '幕府政治'; case 'reform': return (REFORMS[c.kind] || {}).label || '制度改革'; case 'politics': return { consult: '合議', guard: '警固', spy: '諜報', divide: '切り崩し', strike: '反対派の弾圧', compromise: '妥協', retire: '隠居' }[c.act] || '政治'; case 'appoint_office': return '幕府の人事';
+      case 'bakufu': return '幕府政治'; case 'reform': return (REFORMS[c.kind] || {}).label || '制度改革'; case 'vassal_order': return '指図：' + ({ attack: '出陣の要請', defend: '守りの要請', join: '軍団への合流' }[c.act] || ''); case 'politics': return { consult: '合議', guard: '警固', spy: '諜報', divide: '切り崩し', strike: '反対派の弾圧', compromise: '妥協', retire: '隠居' }[c.act] || '政治'; case 'appoint_office': return '幕府の人事';
       case 'spoil': return '没官領の処分'; case 'ando': return '本領安堵'; case 'grant': return '新恩給与'; case 'confiscate': return '所領の没収';
       case 'build_facility': return (FACILITIES[c.kind] || {}).label + 'の普請'; case 'split_corps': return '軍団の分割';
       case 'set_heir': return pname(s, c.person) + 'を後継者に';
@@ -3990,12 +4052,12 @@
     version: ENGINE_VERSION,
     createGame: createGame, advanceDay: advanceDay, runDays: runDays, runUntilMonthEnd: runUntilMonthEnd,
     issueCommand: issueCommand, BUILD: BUILD, buildRights: buildRights, INSTITUTIONS: INSTITUTIONS, bakufuCheck: bakufuCheck,
-    unifyStatus: unifyStatus, killPerson: killPerson, shogunState: shogunState, clanStatus: clanStatus, politicalStatus: politicalStatus, cabalView: cabalView, grudge: grudge, addGrudge: addGrudge, successorCandidates: successorCandidates, candidateInfo: candidateInfo, openSelection: openSelection, applySuccessor: applySuccessor, politicsMonthly: politicsMonthly, cabalTick: cabalTick, tryAssassinate: tryAssassinate, fallPerson: fallPerson, politicsAct: politicsAct, canLead: canLead, ensurePolitics: ensurePolitics, supportFrom: supportFrom, shogunTick: shogunTick, clanTick: clanTick, houseDrift: houseDrift, bakufuChart: bakufuChart, pendingSpoils: pendingSpoils, kinship: kinship, serviceOf: serviceOf, loyaltyTick: loyaltyTick, transferPlayer: transferPlayer, participants: participants, shikkenStatus: shikkenStatus, REFORMS: REFORMS, tie: tie, pName: pName, shogunTie: shogunTie, reformSupport: reformSupport, birthsTick: birthsTick, shogunateTick: shogunateTick, retainersOf: retainersOf, retLoyalty: retLoyalty, landCategory: landCategory, houseTroops: houseTroops, houseHoldings: houseHoldings, houseBands: houseBands, FACILITIES: FACILITIES, ROUTES: ROUTES, houseToFaction: houseToFaction, joinDecision: joinDecision, regimeOf: regimeOf, regimeHouses: regimeHouses, REGIME_ACTS: REGIME_ACTS, heirScore: heirScore, distributeIncome: distributeIncome, jitoAllowed: jitoAllowed, SHARES: SHARES, supplyAt: supplyAt, foodPrice: foodPrice, baseFoodCap: baseFoodCap, DIFFICULTY: DIFFICULTY, GOALS: GOALS, objectiveStatus: objectiveStatus, courtSupport: courtSupport, cliqueAtt: cliqueAtt, insenAvailable: insenAvailable, risesBy: risesBy,
+    unifyStatus: unifyStatus, killPerson: killPerson, shogunState: shogunState, clanStatus: clanStatus, politicalStatus: politicalStatus, orderRetainer: orderRetainer, cabalView: cabalView, grudge: grudge, addGrudge: addGrudge, successorCandidates: successorCandidates, candidateInfo: candidateInfo, openSelection: openSelection, applySuccessor: applySuccessor, politicsMonthly: politicsMonthly, cabalTick: cabalTick, tryAssassinate: tryAssassinate, fallPerson: fallPerson, politicsAct: politicsAct, canLead: canLead, ensurePolitics: ensurePolitics, supportFrom: supportFrom, shogunTick: shogunTick, clanTick: clanTick, houseDrift: houseDrift, bakufuChart: bakufuChart, pendingSpoils: pendingSpoils, kinship: kinship, serviceOf: serviceOf, loyaltyTick: loyaltyTick, transferPlayer: transferPlayer, participants: participants, shikkenStatus: shikkenStatus, REFORMS: REFORMS, tie: tie, pName: pName, shogunTie: shogunTie, reformSupport: reformSupport, birthsTick: birthsTick, shogunateTick: shogunateTick, retainersOf: retainersOf, retLoyalty: retLoyalty, landCategory: landCategory, houseTroops: houseTroops, houseHoldings: houseHoldings, houseBands: houseBands, FACILITIES: FACILITIES, ROUTES: ROUTES, houseToFaction: houseToFaction, joinDecision: joinDecision, regimeOf: regimeOf, regimeHouses: regimeHouses, REGIME_ACTS: REGIME_ACTS, heirScore: heirScore, distributeIncome: distributeIncome, jitoAllowed: jitoAllowed, SHARES: SHARES, supplyAt: supplyAt, foodPrice: foodPrice, baseFoodCap: baseFoodCap, DIFFICULTY: DIFFICULTY, GOALS: GOALS, objectiveStatus: objectiveStatus, courtSupport: courtSupport, cliqueAtt: cliqueAtt, insenAvailable: insenAvailable, risesBy: risesBy,
     estimateOdds: estimateOdds, armyQuality: armyQuality, personFree: personFree, personNear: personNear,
     recruitInfo: recruitInfo, histEventStatus: histEventStatus, sortieSources: sortieSources, oddsFor: oddsFor, parseCommand: parseCommand, resolveEvent: resolveEvent,
     save: save, load: load, validate: validate, summary: summary,
     util: { dateStr: dateStr, armyLabel: armyLabel, provinceInfluence: provinceInfluence, factionPower: factionPower, campPower: campPower,
-      findPath: findPath, atWar: atWar, sameCamp: sameCamp, topLord: topLord, rel: rel, holdingsOf: holdingsOf, travelDays: travelDays,
+      findPath: findPath, distProv: distProv, atWar: atWar, sameCamp: sameCamp, topLord: topLord, rel: rel, holdingsOf: holdingsOf, travelDays: travelDays,
       courtInfluence: courtInfluence, courtController: courtController, estimateDays: estimateDays, availableBandTroops: availableBandTroops, personLocationProvince: personLocationProvince },
   };
 });

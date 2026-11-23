@@ -357,8 +357,11 @@ $('loadFromStart').onclick=function(){ $('start').classList.remove('on'); $('sav
 
 // ================================================================ 時間
 var SPD=[0,900,260,60];
-function setSpeed(v){ speed=v; [].forEach.call(document.querySelectorAll('#speed button'),function(b){b.classList.toggle('on',+b.dataset.s===v);}); if(timer) clearInterval(timer); timer=null; if(v>0) timer=setInterval(tick,SPD[v]); }
-[].forEach.call(document.querySelectorAll('#speed button'),function(b){ b.onclick=function(){ if(S) setSpeed(+b.dataset.s); }; });
+var lastSpeed=1, tickCost=0;
+// 時間の進行：1日ぶんの処理と描画が終わってから次を予約する（重い場面でもクリックやキーが必ず通るように）
+function setSpeed(v){ speed=v; if(v>0) lastSpeed=v; [].forEach.call(document.querySelectorAll('#speed button'),function(b){b.classList.toggle('on',+b.dataset.s===v);}); if(timer) clearTimeout(timer); timer=null; if(v>0) timer=setTimeout(loopTick,Math.min(SPD[v],200)); }
+function loopTick(){ timer=null; if(!S||!speed) return; var t0=performance.now(); tick(); tickCost=performance.now()-t0; if(speed>0&&!timer) timer=setTimeout(loopTick,Math.max(SPD[speed]-tickCost, tickCost*0.5+16)); }
+[].forEach.call(document.querySelectorAll('#speed button'),function(b){ var go=function(e){ if(e){ e.preventDefault(); } if(S) setSpeed(+b.dataset.s); b.blur(); }; b.addEventListener('pointerdown',go); b.onclick=function(e){ e.preventDefault(); }; });
 // 連続アニメーション：1日の移動を、次の更新までの間に街道に沿って滑らかに動かす
 var anim=null;
 function snapshotMovers(){
@@ -396,8 +399,9 @@ function tick(){ if(!S) return; if(S.flags.gameOver){ setSpeed(0); return; } var
 $('step1').onclick=function(){ if(!S) return; setSpeed(0); advanceAnimated(700); showStops(); };
 $('stepM').onclick=function(){ if(!S) return; setSpeed(0); E.runUntilMonthEnd(S); autosave(); render(); showStops(); };
 function autosave(){ try{ localStorage.setItem('genpei_autosave',E.save(S)); }catch(e){} }
+document.addEventListener('keyup',function(e){ if((e.key===' '||e.code==='Space')&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) e.preventDefault(); },true); // ボタンにフォーカスがあってもスペースで押されないように
 document.addEventListener('keydown',function(e){ if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||!S) return;
-  if(e.key===' '){ e.preventDefault(); setSpeed(speed?0:1); } if(e.key==='.') $('step1').click(); if(e.key==='Escape'){ cancelCommand(); hidePop(); } });
+  if(e.key===' '||e.code==='Space'){ e.preventDefault(); if(e.repeat) return; if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); setSpeed(speed?0:lastSpeed); } if(e.key==='.') $('step1').click(); if(e.key==='Escape'){ cancelCommand(); hidePop(); } });
 
 // ================================================================ イベント（自動停止）
 function showStops(){
@@ -1115,11 +1119,22 @@ TABS.faction=function(f,fid){
   var rets=E.retainersOf(S,fid);
   if(rets.length) h+='<div class="card"><h3>家臣の家・御家人</h3><div class="small muted">家（北条氏・比企氏など）は主君に仕えつつ、自分の郎党・所領・蔵を持つ。主君が直接動かせるのは直轄兵だけで、家の兵は出陣の「参陣催促」で集める。本領安堵・新恩給与（所領タブ）・役職で忠誠を保つ。没収は他の家を警戒させる。<b>奉公</b>＝参陣や勝ち戦の働きのうち、まだ報いていない分。多いまま放っておくと忠誠が下がり、忠誠25未満で野心の強い家は<b>謀反</b>しうる（一門は背かない、縁戚は背きにくい）。</div><table class="t"><tr><th>家</th><th class="num">忠誠</th><th class="num">奉公</th><th class="num">兵</th><th class="num">所領</th><th></th></tr>'+rets.map(function(r){ var isH=r.kind==='house', hh=isH?S.houses[r.id]:null, kin=E.kinship(S,fid,r), sv=Math.round(E.serviceOf(S,fid,r.id)), lo=Math.round(E.retLoyalty(S,r,fid));
     return '<tr><td>'+esc(isH?hh.name:fnm(r.id).replace(/（.*）/,''))+'<div class="small muted">'+(isH?'家・当主 '+esc(pnm(hh.head))+'・蔵 '+fmt(hh.money||0)+'貫':'御家人（勢力）')+'</div>'+(kin==='blood'?'<span class="chip gold">一門</span>':kin==='inlaw'?'<span class="chip">縁戚</span>':'')+'</td><td class="num '+(lo<35?'ng':lo>=70?'ok':'')+'">'+lo+(lo<35&&kin!=='blood'?'⚠':'')+'</td><td class="num '+(sv>4?'ng':'')+'">'+sv+'</td><td class="num">'+fmt(isH?E.houseTroops(S,r.id):U.factionPower(S,r.id).available)+'</td><td class="num">'+(isH?E.houseHoldings(S,r.id).length:Object.keys(S.holdings).filter(function(k){return S.holdings[k].controller===r.id;}).length)+'</td><td><button class="btn sub sm" data-ando="'+r.id+'">本領安堵</button></td></tr>'; }).join('')+'</table></div>';
+  if(rets.length){ var enemyB=Object.keys(S.bases).filter(function(k){var b=S.bases[k]; return b.owner&&U.atWar(S,fid,b.owner);}).sort(function(a,b){return U.distProv(S,S.bases[f.capital]?S.bases[f.capital].province:S.bases[a].province,S.bases[a].province)-U.distProv(S,S.bases[f.capital]?S.bases[f.capital].province:S.bases[b].province,S.bases[b].province);}).slice(0,25);
+    var ownB=Object.keys(S.bases).filter(function(k){return S.bases[k].owner&&U.topLord(S,S.bases[k].owner)===U.topLord(S,fid);});
+    var cps=Object.keys(S.corps).filter(function(k){return S.corps[k].faction===fid;});
+    var tgtOpts={attack:enemyB.map(function(k){return opt(k,S.bases[k].name+'（'+S.provinces[S.bases[k].province].name+'・'+fnm(S.bases[k].owner).replace(/（.*）/,'')+'）');}).join(''),
+      defend:ownB.map(function(k){return opt(k,S.bases[k].name+'（'+S.provinces[S.bases[k].province].name+'）');}).join(''),
+      join:cps.map(function(k){return opt(k,pnm(S.corps[k].commander)+'の軍団 → '+(S.corps[k].target?(S.corps[k].target.type==='base'?S.bases[S.corps[k].target.id].name:S.provinces[S.corps[k].target.id].name):'?'));}).join('')};
+    window._vTgt=tgtOpts;
+    h+='<div class="card"><h3>📜 指図（御家人・家への要請）</h3><div class="small">家臣ではないので命令ではなく「頼み」。相手は忠誠・一門か縁戚か・大義・距離・自領の危険・恩賞の滞りで、承知／遅れて承知／断るを決める。承知した軍は頼んだ目標に向かい、果たすと奉公が加わる（恩賞で報いること）。同じ相手には20日あける。たびたび頼むと少し負担に思われる。</div>'+
+      '<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><select id="voWho">'+rets.map(function(r){var isH=r.kind==='house';return opt(r.id,(isH?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,''))+'（忠誠'+Math.round(E.retLoyalty(S,r,fid))+'）');}).join('')+'</select>'+
+      '<select id="voAct"><option value="attack">出陣を頼む（敵の拠点を攻める）</option><option value="defend">守りを頼む（味方の拠点へ）</option>'+(cps.length?'<option value="join">軍団に合流させる</option>':'')+'</select>'+
+      '<select id="voTgt">'+(tgtOpts.attack||'<option value="">（交戦中の敵の拠点がない）</option>')+'</select><button class="btn" id="bVo">頼む</button></div></div>'; }
   var myBases=Object.keys(S.bases).filter(function(k){return S.bases[k].owner===fid&&S.bases[k].type!=='寺社';});
   h+='<div class="card"><h3>★ 本拠点</h3><div class="small">いま：<b>'+esc(f.capital?S.bases[f.capital].name:'なし（流浪）')+'</b>。本拠点は地図で「★本拠」と金の二重の輪で表示（敵の本拠は「敵本拠」）。総大将が出陣しないときは本拠点に残って采配する。</div><div class="row"><select id="capSel">'+myBases.map(function(k){ var b=S.bases[k]; return opt(k,b.name+'（'+S.provinces[b.province].name+'・'+b.type+'・防御'+b.maxDefense+'）'+(k===f.capital?'【現在】':''),k===f.capital); }).join('')+'</select><button class="btn" id="bCap">本拠点を移す</button></div><div class="small muted">移転の費用：100貫＋防御×5貫。攻められている拠点・寺社は不可。当主が出陣中でなければ移る。</div></div>';
   if(['雌伏','密謀'].indexOf(f.status)>=0&&['yoritomo','kiso','kai'].indexOf(fid)>=0) h+='<div class="card"><h3>挙兵</h3><div class="small">'+(f.flags.ryoji?'令旨を受けており大義名分がある。':'<b>令旨をまだ受けていない</b>ため正当性は低い。')+'挙兵すると平家と交戦状態になる。</div><div class="row"><button class="btn red" data-act2="uprise">挙兵する</button></div></div>';
   var vas=Object.keys(S.factions).filter(function(k){return S.factions[k].alive&&S.factions[k].overlord===fid;});
-  if(vas.length) h+='<div class="card"><h3>御家人（主従関係の勢力・AIが自律行動）</h3>'+vas.map(function(k){var p=U.factionPower(S,k);return '<div>'+fsw(k)+esc(fnm(k))+' <span class="small muted">動員可'+fmt(p.available)+' 出陣'+fmt(p.field)+'</span></div>';}).join('')+'<div class="small muted">御家人の武将も総大将・部隊の大将・軍奉行に任じられる。</div></div>';
+  if(vas.length) h+='<div class="card"><h3>御家人（主従関係の勢力・AIが自律行動）</h3>'+vas.map(function(k){var p=U.factionPower(S,k);return '<div>'+fsw(k)+esc(fnm(k))+' <span class="small muted">動員可'+fmt(p.available)+' 出陣'+fmt(p.field)+'</span></div>';}).join('')+'<div class="small muted">御家人は自分の判断で動くが、上の「指図」で出陣・守り・合流を頼める。御家人の武将も総大将・部隊の大将・軍奉行に任じられる。</div></div>';
   h+='<div class="card"><h3>徴兵</h3><div class="small">所領・拠点のある国で兵を召し抱え、武士団を増やす。</div><div class="row"><button class="btn" id="bRecOpen">👥 徴兵する</button></div></div>';
   var pr=E.foodPrice(S);
   h+='<div class="card"><h3>兵糧の購入</h3><div class="small">いまの相場：<b>'+pr+'</b>（平年＝1。収穫期の9〜11月は安く、端境期の4〜7月と飢饉の年は高い）'+(S.flags.famineUntil&&S.day<S.flags.famineUntil?' <span class="chip red">飢饉</span>':'')+'</div><div class="row"><input id="buyAmt" type="number" value="1000" style="width:90px"> 石 <button class="btn sub" id="bBuy">購入</button></div><div class="small muted">蔵の米は毎月1.5%ずつ傷む。軍への補給は補給線（味方の拠点から街道をたどる）が通じている国だけ。</div></div>';
@@ -1313,6 +1328,8 @@ function bindLeft(){
   if(q('bRecOpen')) q('bRecOpen').onclick=function(){ openRecruit(null); };
   if(q('bCap')) q('bCap').onclick=function(){ run({type:'set_capital',base:q('capSel').value}); };
   Array.prototype.forEach.call(document.querySelectorAll('[data-pol]'),function(b){ b.onclick=function(){ run({type:'politics',act:b.getAttribute('data-pol'),cabal:b.getAttribute('data-cb')||null}); }; });
+  if(q('voAct')) q('voAct').onchange=function(){ var v=q('voAct').value; q('voTgt').innerHTML=(window._vTgt||{})[v]||'<option value="">（選べる先がない）</option>'; };
+  if(q('bVo')) q('bVo').onclick=function(){ var act=q('voAct').value, t=q('voTgt').value; if(!t){ toast('✗ 頼む先を選ぶこと',false); return; } run(act==='join'?{type:'vassal_order',vassal:q('voWho').value,act:act,corps:t}:{type:'vassal_order',vassal:q('voWho').value,act:act,target:t}); };
   if(q('bBk')) q('bBk').onclick=function(){ run({type:'bakufu',act:q('bkAct').value,target:q('bkTgt').value,office:q('bkOff')?q('bkOff').value:null}); };
   if(q('bShikken')) q('bShikken').onclick=function(){ run({type:'bakufu',act:'shikken'}); };
   if(q('bApOf')) q('bApOf').onclick=function(){ run({type:'appoint_office',office:q('apOf').value,person:q('apPs').value}); };
