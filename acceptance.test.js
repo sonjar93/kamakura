@@ -652,4 +652,40 @@ ok('61. 無断任官：在京の御家人に朝廷が直接官を与えること
   assert(offered, '朝廷から国司の任命が来る');
   const s2 = izuStart(1); assert(Object.values(s2.provinces).some(pv => pv.kokushi && s2.persons[pv.kokushi.person]), '開始時の国守（史実）が国ごとに入る');
 });
+
+ok('62. 館を与える：家臣に与えると独立した家（御家人）となり兵・所領を持ち、恩を感じる。家・御家人にも与えられる。館の名を改められる', () => {
+  const s = izuStart(2); s.bases.yamaki.owner = 'yoritomo'; s.bases.yamaki.garrison = 20; const r = E.issueCommand(s, { type: 'grant_base', faction: 'yoritomo', base: 'yamaki', to: 'sadatsuna', troops: 10 }); assert(r.ok, r.reason);
+  const h = s.houses.h_sadatsuna; assert(h && h.head === 'sadatsuna' && h.seat === 'yamaki' && s.bases.yamaki.house === 'h_sadatsuna', '独立した家'); assert(h.loyalty >= 90, '恩を感じる');
+  assert(E.retainersOf(s, 'yoritomo').some(x => x.id === 'h_sadatsuna'), '御家人として扱う'); assert(E.houseTroops(s, 'h_sadatsuna') >= 10, '自分の兵');
+  const m = E.issueCommand(s, { type: 'vassal_command', faction: 'yoritomo', act: 'muster' }); assert(m.results.some(x => x.id === 'h_sadatsuna' && x.ok), '兵を増やせる');
+  assert(!E.issueCommand(s, { type: 'grant_base', faction: 'yoritomo', base: 'hirugakojima', to: 'doi' }).ok, '本拠点は与えられない');
+  s.bases.hojo.house = null; s.bases.hojo.owner = 'yoritomo'; const L0 = E.retLoyalty(s, { kind: 'house', id: 'doi' }, 'yoritomo'); assert(E.issueCommand(s, { type: 'grant_base', faction: 'yoritomo', base: 'hojo', to: 'doi' }).ok); assert(E.retLoyalty(s, { kind: 'house', id: 'doi' }, 'yoritomo') > L0);
+  const rn = E.issueCommand(s, { type: 'rename_base', faction: 'yoritomo', base: 'yamaki', name: '佐々木館' }); assert(rn.ok && s.bases.yamaki.name === '佐々木館'); assert(!E.issueCommand(s, { type: 'rename_base', faction: 'yoritomo', base: 'rokuhara', name: 'x' }).ok, '敵の館は改名できない');
+  const s2 = E.load(E.save(s)); assert(s2.houses.h_sadatsuna && s2.bases.yamaki.name === '佐々木館', 'セーブに残る');
+});
+
+ok('63. 忠誠が65を超え戦の最中でない御家人は必ず参陣する（出陣中の手の空いた軍もそのまま加わる）', () => {
+  let bad = 0, tot = 0;
+  for (let seed = 1; seed <= 10; seed++) { const s = izuStart(seed); s.factions.kazusa.overlord = 'yoritomo'; E.util.rel(s, 'kazusa', 'yoritomo').value = 92;
+    const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu'); const r = E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true });
+    s.corps[r.corps].contingents.filter(c => ['kazusa', 'hojo', 'hiki', 'doi'].includes(c.id)).forEach(c => { tot++; if (c.decision !== 'join') bad++; }); }
+  assert(tot >= 40 && bad === 0, '参陣しなかった ' + bad + '／' + tot);
+});
+ok('64. 出陣前に参陣の見込み（家ごとの兵の数）が分かり、家ごとに不要・兵の数を決められる', () => {
+  const s = izuStart(5); s.factions.kazusa.overlord = 'yoritomo'; E.util.rel(s, 'kazusa', 'yoritomo').value = 92;
+  const pv = E.callPreview(s, 'yoritomo', { type: 'base', id: 'yamaki' }); assert(pv.some(x => x.id === 'kazusa' && x.decision === 'join' && x.troops > 100)); assert(pv.every(x => Number.isFinite(x.avail)));
+  const plan = {}; pv.forEach(x => plan[x.id] = x.id === 'doi' ? 0 : x.id === 'kazusa' ? 200 : x.troops);
+  const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu'); const r = E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, callPlan: plan });
+  const cs = s.corps[r.corps].contingents; assert.strictEqual(cs.find(c => c.id === 'doi').decision, 'excused', '不要にした家は呼ばない'); assert(!s.log.some(l => /【不参】土肥/.test(l.text)), '不参の扱いにならない');
+  assert(cs.find(c => c.id === 'kazusa').troops <= 200 && cs.find(c => c.id === 'kazusa').troops >= 150, '決めた兵の数だけ出す');
+});
+ok('65. 加勢：呼ばれていない家や近くの同盟の家が自らの意思で加わることがある。頼朝が本拠を移すと配所はただの館となり与えられる', () => {
+  let vol = 0;
+  for (let seed = 1; seed <= 12 && !vol; seed++) { const s = izuStart(seed); ['kazusa', 'chiba', 'miura'].forEach(k => { s.factions[k].overlord = 'yoritomo'; E.util.rel(s, k, 'yoritomo').value = 95; });
+    const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu'); const r = E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, call: false });
+    for (let d = 0; d < 40; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); if (s.corps[r.corps] && (s.corps[r.corps].volunteers || []).length) { vol++; break; } } }
+  assert(vol > 0, '加勢が起きる');
+  const t = izuStart(1); t.bases.kamakura.owner = 'yoritomo'; E.issueCommand(t, { type: 'set_capital', faction: 'yoritomo', base: 'kamakura' }); t.factions.yoritomo.money += 0; for (let d = 0; d < 3; d++) { t.pendingStops.forEach(e => e.resolved = true); E.advanceDay(t); }
+  if (t.factions.yoritomo.capital === 'kamakura') { assert.strictEqual(t.bases.hirugakojima.name, '蛭ヶ小島館'); t.bases.yamaki.owner = 'x'; assert(E.issueCommand(t, { type: 'grant_base', faction: 'yoritomo', base: 'hirugakojima', to: 'adachi' }).ok, '旧配所を家に与えられる'); }
+});
 console.log(`\n${n} 件の受入条件をすべて満たした`);
