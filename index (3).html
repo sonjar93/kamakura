@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>天下布武以前 ― 平安・鎌倉動乱記（1180 源平合戦）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#f4efe3;--paper2:#ebe3d0;--ink:#1f1a14;--ink2:#5b5244;--line:#cbbf9f;--accent:#8b1e1e;--gold:#c9a227;--panel:#fbf8f1;--ok:#2f6b3a;--ng:#9a2b2b;--shadow:0 2px 6px rgba(0,0,0,.1),0 8px 24px rgba(40,30,10,.12)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#9dc5e0;color:var(--ink);font-family:"Noto Sans JP",system-ui,sans-serif;font-size:13px}
+button{font:inherit;cursor:pointer}
+h1,h2,h3,.mincho{font-family:"Shippori Mincho",serif}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#top{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--ink);color:#f3ead6;flex-wrap:wrap;z-index:6}
+#top .title{font-family:"Shippori Mincho",serif;font-weight:700;letter-spacing:.05em}
+#date{font-family:"Shippori Mincho",serif;font-size:18px;font-weight:700}
+.seg{display:flex;border:1px solid #6b5f4b;border-radius:6px;overflow:hidden}
+.seg button{background:transparent;color:#f3ead6;border:0;padding:5px 9px;border-right:1px solid #6b5f4b}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--gold);color:var(--ink);font-weight:700}
+.tbtn{background:#3a3226;color:#f3ead6;border:1px solid #6b5f4b;border-radius:6px;padding:5px 10px;position:relative}
+.tbtn .badge{position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border-radius:9px;font-size:10px;padding:0 5px;min-width:16px}
+#top .sp{flex:1}
+#pf{font-size:12px;color:#d8cbb0}
+#stage{position:relative;flex:1;min-height:0;display:flex}
+#left{width:350px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;transition:margin-left .2s;z-index:4}
+#left.closed{margin-left:-350px}
+#lToggle{position:absolute;left:350px;top:12px;z-index:5;background:var(--panel);border:1px solid var(--line);border-left:0;border-radius:0 8px 8px 0;padding:10px 5px;box-shadow:var(--shadow);transition:left .2s}
+#left.closed + #lToggle{left:0}
+.tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--paper)}
+.tabs button{border:0;background:transparent;padding:7px 8px;color:var(--ink2);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+.pbody{overflow:auto;padding:10px 12px;flex:1;min-height:0}
+#mapwrap{position:relative;flex:1;min-width:0;overflow:hidden;background:#9dc5e0}
+#map{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#map.targeting{cursor:crosshair}
+#right{position:absolute;right:0;top:0;bottom:0;width:360px;background:var(--panel);border-left:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .2s;z-index:5}
+#right.open{transform:none}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.card h3{margin:0 0 6px;font-size:14px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px;margin:0}
+.kv dt{color:var(--ink2)}.kv dd{margin:0}
+.chip{display:inline-block;padding:1px 6px;border-radius:10px;font-size:11px;background:var(--paper2);color:var(--ink2);margin:1px 2px 1px 0}
+.chip.red{background:#f4d9d5;color:#8b1e1e}.chip.green{background:#dcebd8;color:#2f6b3a}.chip.gold{background:#f1e6c5;color:#6d5214}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;border:1px solid rgba(0,0,0,.35);vertical-align:-1px;margin-right:4px}
+table.t{width:100%;border-collapse:collapse;font-size:12px}
+table.t td,table.t th{padding:3px 4px;border-bottom:1px solid #eee5d0;text-align:left;vertical-align:top}
+table.t th{color:var(--ink2);font-weight:500}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.btn{background:var(--ink);color:#fff;border:0;border-radius:6px;padding:6px 11px}
+.btn.sub{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.red{background:var(--accent)}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+select,input,textarea{font:inherit;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:#fff;max-width:100%}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:5px 0}
+.muted{color:var(--ink2)}.small{font-size:11.5px}
+.ok{color:var(--ok)}.ng{color:var(--ng)}
+.bar{display:flex;height:14px;border-radius:4px;overflow:hidden;border:1px solid rgba(0,0,0,.12);margin:3px 0;background:#f1ece0}
+.bar span{display:block;height:100%}
+.hbar{display:grid;grid-template-columns:110px 1fr 60px;gap:6px;align-items:center;font-size:12px;margin:3px 0}
+.hbar .b{height:12px;border-radius:3px}
+.prog{height:8px;background:#e9e0cb;border-radius:4px;overflow:hidden}.prog i{display:block;height:100%;background:var(--gold)}
+/* map svg */
+.plabel{font-family:"Shippori Mincho",serif;font-weight:700;fill:#2b2418;paint-order:stroke;stroke:rgba(255,255,255,.85);pointer-events:none}
+.blabel{fill:#1f1a14;paint-order:stroke;stroke:#fff;pointer-events:none}
+.road{stroke:#8a6d3b;fill:none;opacity:.6;stroke-linejoin:round;stroke-linecap:round}
+.road.sea{stroke:#2f5f86;opacity:.55}
+.base,.army{cursor:pointer}
+.army.marching .walker{animation:walk .5s steps(2) infinite}
+.army.battle .walker{animation:clash .35s ease-in-out infinite alternate}
+@keyframes walk{0%{transform:translateY(0)}50%{transform:translateY(-1.3px)}}
+@keyframes clash{0%{transform:translateX(0)}100%{transform:translateX(1.5px)}}
+.battle-mark{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.9}50%{opacity:.35}}
+/* floating */
+#layersBtn{position:absolute;left:36px;top:10px;z-index:3}
+#layers{position:absolute;left:36px;top:52px;background:rgba(251,248,241,.97);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:var(--shadow);display:none;z-index:3;max-width:280px}
+#layers.on{display:block}
+#layers label{display:block;white-space:nowrap}
+.lg{display:inline-block;width:22px;height:12px;vertical-align:-2px;margin-right:4px}
+#zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:4px;z-index:3}
+#zoom button,.fbtn{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:17px;box-shadow:var(--shadow)}
+.fbtn{width:auto;padding:0 10px;font-size:13px}
+#toolbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:2px;background:rgba(251,248,241,.96);border:1px solid var(--line);padding:3px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12);z-index:3;flex-wrap:nowrap;white-space:nowrap;max-width:calc(100% - 20px);overflow-x:auto}
+#toolbar button{background:transparent;color:var(--ink);border:0;border-radius:7px;padding:6px 10px;font-size:12.5px}
+#toolbar button:hover{background:var(--paper2)}
+#toolbar button.red{background:var(--accent);color:#fff}
+#ticker{position:absolute;right:56px;top:10px;width:330px;z-index:2;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+#ticker div{background:rgba(251,248,241,.95);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:6px;padding:4px 8px;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,.1);transition:opacity .6s}
+#ticker div.new{animation:fadein .35s}
+#ticker div.old{opacity:0}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}}
+#toast{position:fixed;left:calc(50% + 175px);top:60px;transform:translateX(-50%);z-index:40;pointer-events:none;display:none;max-width:min(460px,80%);background:#fff;border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:8px;padding:8px 12px;box-shadow:var(--shadow)}
+#toast.ng{border-left-color:var(--ng)}
+#hint{pointer-events:none;position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--accent);color:#fff;padding:7px 14px;border-radius:18px;display:none;box-shadow:var(--shadow);z-index:5;font-size:13px}
+#hover{position:absolute;pointer-events:none;background:rgba(31,26,20,.92);color:#fff;padding:5px 8px;border-radius:6px;font-size:12px;display:none;z-index:6;white-space:nowrap}
+#pop{position:absolute;z-index:6;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;min-width:230px;max-width:320px;display:none}
+#pop h4{margin:0 0 4px;font-family:"Shippori Mincho",serif;font-size:15px}
+#pop .acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(20,15,8,.55);display:none;align-items:center;justify-content:center;z-index:20;padding:12px}
+.modal.on{display:flex}
+.mbox{background:var(--panel);max-width:600px;width:100%;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:hidden;max-height:94vh;display:flex;flex-direction:column}
+.mhead{background:var(--ink);color:#f3ead6;padding:12px 16px}
+.mhead h2{margin:0;font-size:20px}
+.mhead .meta{font-size:12px;color:#d8cbb0;margin-top:3px}
+.mbody{padding:14px 16px;overflow:auto;line-height:1.7}
+.mfoot{padding:10px 16px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--line)}
+#start .mbox{max-width:900px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.fopt{text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px}
+.fopt:hover{border-color:var(--accent)}
+.fopt b{font-family:"Shippori Mincho",serif;font-size:15px}
+.fopt .d{font-size:11.5px;color:var(--ink2);margin-top:4px;line-height:1.5}
+.diff{float:right;font-size:11px}
+.mode{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.mode label{flex:1;min-width:240px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 10px;cursor:pointer}
+.mode label:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 2px rgba(139,30,30,.15)}
+.mode b{font-family:"Shippori Mincho",serif;font-size:15px}
+#orgModal .mbox{max-width:680px}
+.divrow{display:grid;grid-template-columns:1fr 90px 30px;gap:6px;align-items:center;margin:4px 0}
+#map,#map *{user-select:none;-webkit-user-select:none}
+.steps{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}.steps span{font-size:12px;padding:3px 9px;border-radius:12px;background:var(--paper2);color:var(--ink2)}.steps span.on{background:var(--accent);color:#fff}
+.pick{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;margin:4px 0;background:#fff;cursor:pointer;width:100%;text-align:left}
+.pick:hover{border-color:var(--accent)}.pick.on{border-color:var(--accent);background:#fbf0ee}
+.pick .r{margin-left:auto;text-align:right;font-size:12px;color:var(--ink2)}
+.err{background:#f9e3e0;color:#8b1e1e;border:1px solid #e6b8b1;border-radius:6px;padding:6px 9px;margin:6px 0;font-size:12.5px}
+.unit{display:grid;grid-template-columns:1fr 1.3fr 80px 28px;gap:6px;align-items:center;margin:4px 0}
+.tag{font-size:10px}
+.quality{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px}
+.qbig{font-size:22px;font-weight:700;font-family:"Shippori Mincho",serif}
+.hev{border-left:4px solid var(--line)}.hev.done{border-left-color:#2f6b3a}.hev.ready{border-left-color:#c9a227}.hev.expired,.hev.declined{border-left-color:#9a2b2b;opacity:.75}
+.cond{font-size:11.5px}.cond.y::before{content:'✔ ';color:#2f6b3a}.cond.n::before{content:'✘ ';color:#9a2b2b}
+#help .mbox{max-width:720px}#help h3{margin:12px 0 4px;font-size:15px}
+@media (max-width:1400px){#top .title{display:none}}
+@media (max-width:1100px){.seg button{padding:5px 6px}#pf .chip{display:none}}
+@media (max-width:820px){
+  #layersBtn{left:10px}#layers{left:10px}
+  #left{position:absolute;left:0;right:0;bottom:0;top:auto;width:auto;height:52%;border-right:0;border-top:2px solid var(--accent);margin-left:0!important;transform:none;transition:transform .2s}
+  #left.closed{transform:translateY(100%)}
+  #lToggle{display:none}
+  #right{width:100%}
+  #toolbar{bottom:8px;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;max-width:calc(100% - 16px)}#toolbar button{padding:6px 8px;font-size:12px;white-space:nowrap}
+  #ticker{display:none}
+  #top .title{display:none}#date{font-size:15px}
+}
+@media (max-width:900px){#toast{left:50%}}
+#left .tabs button{touch-action:manipulation}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <span class="title">天下布武以前 ― 平安・鎌倉動乱記</span>
+    <span id="date">—</span>
+    <div class="seg" id="speed"><button data-s="0" class="on">⏸ 停止</button><button data-s="1">▶ 通常</button><button data-s="2">▶▶ 高速</button><button data-s="3">▶▶▶ 超高速</button></div>
+    <button class="tbtn" id="step1">＋1日</button><button class="tbtn" id="stepM">月送り</button>
+    <span class="sp"></span><span id="pf"></span>
+    <button class="tbtn" id="newsBtn">📰 ニュース<span class="badge" id="newsBadge" style="display:none">0</span></button>
+    <button class="tbtn" id="helpBtn" title="操作説明">？</button><button class="tbtn" id="saveBtn">💾</button><button class="tbtn" id="newBtn">新規</button>
+  </div>
+  <div id="stage">
+    <div id="left">
+      <div class="tabs" id="ltabs">
+        <button data-t="overview" class="on">情勢</button><button data-t="history">史実</button><button data-t="faction">自勢力</button><button data-t="armies">軍勢</button><button data-t="vassals">御家人</button><button data-t="persons">人物</button>
+        <button data-t="holdings">所領</button><button data-t="rewards">恩賞</button><button data-t="diplomacy">外交</button><button data-t="court">朝廷</button><button data-t="bakufu">幕府</button><button data-t="build">普請</button><button data-t="select">選択</button>
+      </div>
+      <div class="pbody" id="lbody"></div>
+    </div>
+    <button id="lToggle" title="パネルを開閉">◀</button>
+    <div id="mapwrap">
+      <svg id="map" viewBox="0 0 1402 1292" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <symbol id="sold" viewBox="-6 -16 12 18" overflow="visible">
+            <line x1="-3.5" y1="-15" x2="-3.5" y2="-1" stroke="#111" stroke-width=".7"/>
+            <rect x="-3.4" y="-15" width="3.2" height="5.2" stroke="#111" stroke-width=".4"/>
+            <circle cx="0" cy="-8.3" r="1.6" fill="#111"/><path d="M-2.6 -10 L2.6 -10 L0 -11.4 Z" fill="#111"/>
+            <path d="M-1.7 -6.7 L1.8 -6.7 L2.2 -2.3 L-2.1 -2.3 Z" fill="#111"/>
+            <path d="M-1.6 -2.4 L-2.8 1.2 L-1.6 1.2 L-.3 -2.4 Z M1.4 -2.4 L2.7 1.2 L1.5 1.2 L.2 -2.4 Z" fill="#111"/>
+            <line x1="1.8" y1="-5.2" x2="6.5" y2="-11.5" stroke="#111" stroke-width=".6"/><path d="M6.5 -11.5 l.9 -1.6 l-.1 1.9 z" fill="#111"/>
+          </symbol>
+          <symbol id="runner" viewBox="-5 -10 10 12" overflow="visible">
+            <circle cx="0" cy="-7" r="1.4" fill="#222"/><path d="M-1.3 -5.6 L1.6 -5.6 L1.2 -2 L-1.4 -2 Z M-1.2 -2 L-2.6 1 M1 -2 L2.4 .6" stroke="#222" stroke-width="1" fill="#222"/>
+            <rect x="1.6" y="-6.6" width="2.6" height="2" fill="#fff" stroke="#222" stroke-width=".4"/>
+          </symbol>
+        </defs>
+        <g id="vp">
+          <image href="basemap.png" x="0" y="0" width="1402" height="1292" preserveAspectRatio="none"/>
+          <g id="gTerr"></g><g id="gCoast" style="pointer-events:none"></g><g id="gRoads" style="pointer-events:none"></g>
+          <g id="gRoute" style="pointer-events:none"></g><g id="gProv"></g><g id="gBuild"></g><g id="gBases"></g>
+          <g id="gBattles"></g><g id="gEnvoys"></g><g id="gArmies"></g>
+        </g>
+      </svg>
+      <button class="fbtn" id="layersBtn">☰ 表示</button>
+      <div id="layers">
+        <label><input type="checkbox" data-l="gTerr" checked> 勢力範囲</label>
+        <label><input type="checkbox" data-l="gRoads" checked> 街道・海路</label>
+        <label><input type="checkbox" data-l="gProv" checked> 国名</label>
+        <label><input type="checkbox" data-l="gBases" checked> 拠点・寺社・港</label>
+        <label><input type="checkbox" data-l="gArmies" checked> 軍勢</label>
+        <label><input type="checkbox" data-l="gEnvoys" checked> 使者</label>
+        <label><input type="checkbox" id="lblBases" checked> 拠点名（拡大時）</label>
+        <hr style="border:0;border-top:1px solid var(--line)">
+        <div><span class="lg" style="background:#c4dca4;box-shadow:inset 0 0 0 3px #c0392b"></span>国の内側の縁＝最も力を持つ勢力</div>
+        <div><span class="lg" style="background:#c4dca4;border:3px dashed #3f6fbf;box-shadow:inset 0 0 0 3px #c0392b"></span>二色の破線＝二勢力が拮抗</div>
+        <div><span class="lg" style="border-top:3px solid #8a6d3b;height:0"></span>街道　<span class="lg" style="border-top:3px solid #2f5f86;height:0"></span>海路</div>
+      </div>
+      <div id="zoom"><button id="zin" title="拡大">＋</button><button id="zout" title="縮小">－</button><button id="zfit" title="全体">⤢</button><button id="zhome" title="畿内〜関東">⌂</button></div>
+
+      <div id="ticker"></div>
+      <div id="toast"></div><div id="hint"></div><div id="hover"></div><div id="pop"></div>
+    </div>
+    <div id="right">
+      <div class="tabs" id="rtabs"><button data-t="news" class="on">ニュース</button><button data-t="mine">自勢力</button><button data-t="battles">合戦記録</button><button data-t="ai">AI判断</button><button data-t="cmds">命令履歴</button><button data-t="check">年代検証</button><button data-t="close" style="margin-left:auto">✕</button></div>
+      <div class="pbody" id="rbody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="evmodal"><div class="mbox"><div class="mhead"><h2 id="evTitle"></h2><div class="meta" id="evMeta"></div></div><div class="mbody" id="evBody"></div><div class="mfoot" id="evFoot"></div></div></div>
+
+<div class="modal" id="orgModal"><div class="mbox">
+  <div class="mhead"><h2 id="orgTitle">出陣の編成</h2><div class="meta">総大将・各部隊の大将・軍奉行を家臣（自勢力と御家人）から選ぶ。編成で戦の勝算が変わる。</div></div>
+  <div class="mbody" id="orgBody"></div>
+  <div class="mfoot" id="orgFoot"></div>
+</div></div>
+
+<div class="modal" id="start"><div class="mbox">
+  <div class="mhead"><h2>治承四年（1180）源平争乱 ― 家を選ぶ</h2><div class="meta">開始：治承4年4月1日。以仁王の令旨はまだ発せられていない。</div></div>
+  <div class="mbody">
+    <div class="mode">
+      <label><input type="radio" name="mode" value="historical" checked> <b>史実モード</b><div class="small muted">令旨・挙兵・遷都・鎌倉入り・追討軍などが史実の日付に起こる。主要人物は自分が関わらない戦いでは史実の没年まで死なない。自勢力の分岐点では「史実どおりにするか」を選べる。</div></label>
+      <label><input type="radio" name="mode" value="free"> <b>自由モード</b><div class="small muted">史実は強制されない。出来事は状況とAIの判断だけで起こる。思うままに歴史を変えられる。</div></label>
+    </div>
+    <div class="mode">
+      <label><input type="radio" name="diff" value="easy"> <b>やさしい</b><div class="small muted">敵がこちらに向ける兵が少なく（×0.65）、挙兵後の猶予が長い。呼応する兵・収入が多い。</div></label>
+      <label><input type="radio" name="diff" value="normal" checked> <b>ふつう</b><div class="small muted">敵の兵×0.85、猶予やや長め。はじめての方に。</div></label>
+      <label><input type="radio" name="diff" value="hard"> <b>むずかしい</b><div class="small muted">補正なし。史実どおりの厳しさ。</div></label>
+    </div>
+    <div class="mode">
+      <label><input type="radio" name="goal" value="campaign"> <b>キャンペーン：源氏→北条執権</b><div class="small muted">源頼朝で始め、頼朝が世を去ると北条氏へ移る（同じセーブで続く）。御家人の権力闘争に勝って執権となり、その後は終わりなく幕府を運営する。</div></label>
+      <label><input type="radio" name="goal" value="objective" checked> <b>勢力の目標</b><div class="small muted">家ごとに目指すものが違う（平家＝政権の存続、頼朝＝武家政権の樹立、義仲＝入京と官職、奥州＝独立と富…）。条件がすべてそろえばクリア。</div></label>
+      <label><input type="radio" name="goal" value="survive"> <b>家の存続</b><div class="small muted">建久元年（1190）4月まで家を保てばクリア。</div></label>
+      <label><input type="radio" name="goal" value="unify"> <b>天下統一</b><div class="small muted">寺社・朝廷を除く全拠点を押さえ、5年保てばクリア。</div></label>
+      <label><input type="radio" name="goal" value="none"> <b>勝利条件なし</b><div class="small muted">自由に遊ぶ・歴史の行方を眺める（観戦にも）。</div></label>
+    </div>
+    <div class="quality small" style="margin-bottom:10px"><b>敗北：</b>自家の拠点をすべて失うと<b>滅亡</b>（ゲームオーバー）。</div>
+    <div class="fgrid" id="fgrid"></div>
+    <div class="row small muted" style="margin-top:10px">乱数シード <input id="seed" type="number" value="1180" style="width:90px">（同じシードなら同じ展開）　<label><input type="checkbox" id="watch"> 観戦モード</label></div>
+  </div>
+  <div class="mfoot"><button class="btn sub" id="loadFromStart">セーブを読み込む</button></div>
+</div></div>
+
+<div class="modal" id="help"><div class="mbox">
+  <div class="mhead"><h2>操作と仕組み</h2></div>
+  <div class="mbody">
+    <h3>源頼朝での遊び方（はじめての方へ）</h3>
+    <div>頼朝は流人で、直轄の兵はわずか。<b>自分の兵で国を取るのではなく、御家人（関東の武士団）の兵で戦い、取った土地を配って味方を増やしていく</b>のが基本。</div>
+    <div>1. <b>挙兵まで</b>：外交タブの使者で三浦・千葉・上総などに同盟や臣従を働きかける。徴兵で伊豆の兵を少しでも増やす。</div>
+    <div>2. <b>挙兵</b>：軍勢タブ「⚔ 出陣の編成」で山木館を攻める。「家臣の家・御家人に参陣を命じる」をオンにすると、北条・土肥などの家が参陣する。<b>先陣</b>を任せた家は来やすい。</div>
+    <div>3. <b>御家人を増やす</b>：頼朝が大軍で近づくと、平家方の東国武士も帰順してくる（畠山など）。いったん主従を結んだ家は、恩義を欠かなければ簡単には背かない。</div>
+    <div>4. <b>御家人の兵を使う</b>：出陣のたびに参陣を命じるか、「御家人」タブで全家に命じる（兵を増やせ・出陣・守り・軍団に加われ・帰陣）か、一家ずつ「📜 指図」で頼む。地図では<b style="color:#1e7a45">緑</b>の名前・「御家人」の札が御家人、<b style="color:#1d4f91">青</b>が自勢力、<b style="color:#8b1e1e">赤</b>が敵。</div>
+    <div>5. <b>報いる</b>：勝つと論功行賞の場面が出る。感状・引出物、屋敷、官途の推挙・所領の給与・没官領の処分は「恩賞」タブにまとめてある。報いないと奉公がたまり、参陣しなくなる。</div>
+    <div>6. <b>鎌倉を固める</b>：相模の鎌倉を本拠にし、侍所などの機関を整える。京から大江広元・三善康信らの文官が下ってきて（1183〜84年ごろ、状況しだい）、公文所・問注所を任せられる。幕府を開いて東国を固めたら、西へ。</div>
+    <h3>勝ち負け</h3>
+    <div>・<b>目的</b>は開始時に選ぶ。「勢力の目標」は家ごとに違う条件（情勢タブの先頭にチェックリストで出る）。「家の存続」は1190年4月まで保つ。「天下統一」は寺社・朝廷を除く全拠点を押さえて5年保つ。<br>・<b>朝廷</b>：院方・摂関家・天皇側近・親平家の公家・寺社と結ぶ公家の5つの派閥が、それぞれ各家への態度を持つ。任官・追討宣旨・院宣の成否は派閥の影響力×態度で決まる。献金や儀式の支援で態度を上げられる。法皇が幽閉中は院宣が出ない。都を実際に押さえた家へ朝廷の主導権が移り、摂関の交代や、天皇が都を離れたときの新帝の践祚も起こる。<br>・<b>キャンペーン</b>（開始時に選ぶ）：源頼朝で始め、頼朝が世を去ると北条氏へ操作が移る（A方式。源氏はCPUの将軍家として続き、北条氏は自家の所領・郎党・蔵だけを持つ）。幕府タブで比企・三浦・和田・梶原ら御家人と権力闘争（同盟・婚姻・役職・孤立・訴え・討伐）を行い、条件（頼朝の死・執権の成立年・政所・最大の影響力・将軍家との関係）がそろえば執権に就く。就任後は人事と制度改革（執権の権限・連署・評定衆・訴訟・所領管理・地方統治・御家人統制）で幕府を運営し、ゲームは終わらない。頼家・泰時・実朝は親が生きていれば史実の年に生まれる。<br>・<b>家と御家人</b>：勢力（政治・軍事の集団）と家（一族）は別。北条氏・比企氏・土肥氏は頼朝に仕えつつ、自分の郎党・所領・蔵を持つ（頼朝の本拠は蛭ヶ小島の配所、鎌倉入りで鎌倉）。土地は将軍家（主君）の直轄領／御家人・武家の所領／朝廷・寺社の所領／国衙領に分かれる。主君は本領安堵・新恩給与・没収・役職で家を動かし、出陣では<b>参陣催促</b>で各家が参陣・遅参・不参を決める。参陣した兵は合流地点で本隊に加わる。大軍は軍団に分けて別の道（東海道・東山道・北陸道・山陽道）から進める。所領には市場・農地・道路・橋・倉庫・寺社・砦・館を建てられる（本所の許しが要る土地もある）。<br>・<b>政権の体制</b>：どの家も当主依存・組織成熟・後継安定・家臣結束・権力集中・地方統制・正統性・外交能力を持ち、行動や事件で動く（自勢力タブ）。当主が死ぬと、これらと後継者の力量・外敵の強さで、安定した継承／派閥争い／内乱（家臣の離反）／分裂（対抗馬の自立）が決まる。CPU は自家の弱点を見て、後継者の基盤づくり・恩賞・機構の整備などを行い、他家の代替わりや内紛を攻めの好機にする。<br>・・<b>兵站</b>：軍は、味方の拠点から街道をたどる<b>補給線</b>が通じている国では本拠の蔵から兵糧を受け取る（遠いほど目減り）。敵の拠点・大軍のいる国の先には届かない。補給線の外では現地調達だけで、冬・荒れた国・飢饉では足りない。兵糧が尽きると逃亡が出て、6日続けば退く。城には籠城の兵糧があり、包囲されて尽きると城兵が落ち、やがて開城する。<br>・<b>所領</b>：一つの所領に本所（名目）・知行国主／預所（徴税）・地頭・実効支配（軍事）の権利があり、年貢を分け合う。戦う相手の取り分は押領できるが、本所の朝廷・寺社に恨まれる。知行国は朝廷が改める。幕府は文治元年（1185）11月の勅許から地頭を置ける。<br>・<b>CPU</b>は、敵の主力が別の戦線に出払った隙、兵糧、本拠の守り、落とした後に保てるかを見て動く。判断の理由は「ニュース」の「AI」に評定の言葉で残る。<br>・<b>敗北</b>：自家の拠点をすべて失うと<b>滅亡</b>。<br>・<b>挙兵</b>：雌伏中の家が平家方の拠点・軍勢を攻めると、その出陣がそのまま挙兵になる（「挙兵」ボタンで先に挙兵してもよい）。挙兵すると地元の武士が呼応して集まり、しばらく攻め手に奇襲の利がつく。近くの平家方が攻めて来るまで10日ほど（難易度で延びる）、京からの追討軍はひと月半ほどかかる。<br>・<b>籠城</b>：拠点が攻められると、その国でまだ動員していない武士団が籠城に加わる。</div>
+    <h3>地図の操作</h3>
+    <div>・<b>ドラッグ</b>（左ボタン／中ボタン）、<b>トラックパッドの二本指スワイプ</b>、<b>矢印キー・WASD</b>で移動。マウスホイール・ピンチ・ダブルクリック・＋－キーで拡大縮小。⌂で畿内〜関東、⤢で全国。<br>・<b>自軍をクリック → 行き先をクリック</b>で進軍。カーソルを置くと街道に沿った経路・日数・勝算が出る。右クリック／Escで取消。<br>・<b>自分の拠点をクリック</b>すると「出陣」「徴兵」「守備を増やす」「普請」「本拠にする」を選べる。国をクリックしても同様。</div>
+    <h3>兵の仕組み</h3>
+    <div>・兵は<b>武士団</b>として国ごとにいる（家ごとの「動員できる兵」。情勢・自勢力タブで確認）。<br>・<b>徴兵</b>：自分の所領・拠点がある国で、郎党・所従・駆り武者を新たに召し抱え、その国の武士団を増やす。資金と兵糧がかかり、20日ほどかけて少しずつ集まる。上限は所領の種類と石高で決まる（私領・郷は多く、知行国の国衙領は少ない）。<br>・<b>出陣</b>：①攻め先 → ②兵を出す拠点（複数可、各拠点の出陣できる兵は地図の「⚔数字」） → ③総兵数を決め、拠点ごとに大将と兵数を割り振り、総大将と軍奉行を選ぶ → 出陣。各部隊はそれぞれの拠点から攻め先へ向かい合流する。出陣中の軍団がある時は「合流（後詰め）」も選べる。<br>・地図上では近くにいる部隊がまとまり「〇〇の軍　兵数（隊の数）」と表示される。クリックで内訳。<br>・<b>守備を増やす</b>：武士団の兵を拠点の守備兵に回す。<br>・戦で減った兵は戻らず、武士団は毎月少しずつ回復する。</div>
+    <h3>時間</h3>
+    <div>・停止／通常／高速／超高速、＋1日、月送り。スペースキーで停止・再開。重要な出来事では自動で止まる。</div>
+    <h3>史実イベント</h3>
+    <div>・「史実」タブに、出来事の名称・史実の日付・発生条件をまとめている。条件がすべてそろうと発生する（信長の野望の史実イベントと同じ考え方）。自分の家が当事者なら「史実どおりにするか」を選べる。<br>・史実モードでは期限を過ぎると起こらない。自由モードでは期限がなく、他家は条件がそろってもすぐには動かない。</div>
+    <h3>他家（AI）</h3>
+    <div>・毎月：徴兵・兵糧の購入・守備の増強・普請・寄進。数日ごと：攻撃・防衛・退却・味方の勧誘・朝廷工作・去就の判断。理由はニュースの「AI判断」で見られる。</div>
+  </div>
+  <div class="mfoot"><button class="btn" data-close>閉じる</button></div>
+</div></div>
+
+<div class="modal" id="sortieModal"><div class="mbox" style="max-width:720px">
+  <div class="mhead"><h2 id="soTitle">出陣</h2><div class="meta" id="soMeta">攻め先 → 兵を出す拠点（複数可） → 総兵数と大将の割り振り → 出陣</div></div>
+  <div class="mbody" id="soBody"></div><div class="mfoot" id="soFoot"></div>
+</div></div>
+
+<div class="modal" id="recModal"><div class="mbox" style="max-width:480px">
+  <div class="mhead"><h2>徴兵</h2><div class="meta">所領・拠点のある国で兵を召し抱え、その国の武士団を増やす</div></div>
+  <div class="mbody" id="recBody"></div><div class="mfoot" id="recFoot"></div>
+</div></div>
+
+<div class="modal" id="savemodal"><div class="mbox">
+  <div class="mhead"><h2>セーブ／ロード</h2><div class="meta">JSON 形式（Claude版・Web版共通）。コピーして保存してください。</div></div>
+  <div class="mbody">
+    <div class="row"><button class="btn" id="copySave">現在の状態をコピー</button><span id="copyMsg" class="small"></span></div>
+    <textarea id="saveText" rows="8" style="width:100%;font-family:monospace;font-size:11px" placeholder="セーブデータ（JSON）を貼り付けて「読み込む」"></textarea>
+    <div class="row"><button class="btn" id="doLoad">貼り付けたデータを読み込む</button><button class="btn sub" id="loadLocal">ブラウザの自動セーブから復元</button></div>
+  </div>
+  <div class="mfoot"><button class="btn sub" data-close>閉じる</button></div>
+</div></div>
+
+<script>
+// 読み込みの診断：どのファイルが届いていないかを画面に出す（GitHub Pages などに置いたとき用）
+window.__loadFail=function(what){ var d=document.getElementById('loadErr'); if(!d){ d=document.createElement('div'); d.id='loadErr'; d.style.cssText='position:fixed;left:50%;top:80px;transform:translateX(-50%);z-index:9999;background:#fff8ec;border:2px solid #8b1e1e;border-radius:8px;padding:16px 20px;max-width:640px;font-size:14px;line-height:1.7;box-shadow:0 6px 24px rgba(0,0,0,.3)'; (document.body||document.documentElement).appendChild(d); }
+  d.innerHTML='<b style="color:#8b1e1e;font-size:16px">ゲームを起動できませんでした</b><br>'+what+'<br><br>index.html と同じ場所に、次の6つのファイルがすべて必要です（名前は大文字・小文字も同じに）：<br><code>index.html / engine.js / scenario_1180.json / provinces_geo.json / basemap.png / provinces.png</code><br>（GitHub Pages では、アップロード後の反映に数分かかることがあります）'; };
+</script>
+<script src="engine.js" onerror="window.__engineMissing=true"></script>
+<script>
+if(!window.GenpeiEngine){ window.__loadFail('<b>engine.js</b> が読み込めません（'+(window.__engineMissing?'ファイルが見つからない':'ファイルの中身が壊れている')+'）。'); throw new Error('engine.js missing'); }
+</script>
+<script>
+(function(){
+'use strict';
+var E=window.GenpeiEngine, U=E.util;
+var SCN=null, S=null, GEO=null, PR=null, speed=0, timer=null;
+window._game=function(){return S;};
+var sel=null;            // {type:'army'|'base'|'province', id}
+var command=null;        // 目的地指定モード：{kind:'move', army} | {kind:'build', scale, name} | {kind:'muster'}
+var ltab='overview', rtab='news', seenLog=0;
+var view={x:0,y:0,w:1402,h:1292};
+var $=function(id){return document.getElementById(id);};
+function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fmt(n){return Math.round(n||0).toLocaleString('ja-JP');}
+function F(id){return S.factions[id];} function P(id){return S.persons[id];}
+function fcol(id){return id&&S.factions[id]?S.factions[id].color:'#999';}
+function fsw(id){return '<span class="sw" style="background:'+fcol(id)+'"></span>';}
+function fnm(id){return id&&S.factions[id]?S.factions[id].name:'—';}
+function pnm(id){return id&&P(id)?P(id).name:'—';}
+function opt(v,l,s){return '<option value="'+esc(v)+'"'+(s?' selected':'')+'>'+esc(l)+'</option>';}
+function myF(){return S&&S.playerFaction?F(S.playerFaction):null;}
+var DIFF={heike:'易',oshu:'易',yoritomo:'難',kiso:'中',kai:'中',mochihito:'至難',miura:'難',kazusa:'中'};
+
+// ================================================================ 起動
+var getJ=function(f){ return fetch(f).then(function(r){ if(!r.ok) throw new Error('<b>'+f+'</b> が見つかりません（'+r.status+'）'); return r.json().catch(function(){ throw new Error('<b>'+f+'</b> の中身が読めません（壊れているか、別のファイル）'); }); }); };
+Promise.all([getJ('scenario_1180.json'), getJ('provinces_geo.json')])
+ .then(function(a){ SCN=a[0]; GEO=a[1]; buildClipPaths(); startScreen(); })
+ .catch(function(e){ window.__loadFail(String(e && e.message || e)+(location.protocol==='file:'?'<br>※ index.html を直接開いているため読み込めません。簡易サーバー（python3 -m http.server）か GitHub Pages で開いてください。':'')); });
+(function(){ var img=new Image(); img.onload=function(){ var c=document.createElement('canvas'); c.width=1402; c.height=1292; var x=c.getContext('2d'); x.drawImage(img,0,0); PR=x.getImageData(0,0,1402,1292).data; }; img.src='provinces.png'; })();
+function provAt(x,y){ if(!PR||!SCN) return null; x=Math.round(x); y=Math.round(y); if(x<0||y<0||x>=1402||y>=1292) return null; var v=PR[(y*1402+x)*4]; return v?SCN.meta.map.provinceOrder[v-1]:null; }
+
+function startScreen(){
+  var g=$('fgrid'); g.innerHTML='';
+  SCN.factions.filter(function(f){return f.playable;}).forEach(function(f){
+    var b=document.createElement('button'); b.className='fopt';
+    var leader=SCN.persons.filter(function(p){return p.id===f.leader;})[0];
+    b.innerHTML='<span class="diff chip">'+(DIFF[f.id]||'')+'</span><span class="sw" style="background:'+f.color+'"></span><b>'+esc(f.name)+'</b><div class="small muted">当主：'+esc(leader?leader.name:'')+'　'+esc(f.type)+'</div><div class="d">'+esc(f.description)+'</div>'+(SCN.objectives&&SCN.objectives[f.id]?'<div class="small" style="margin-top:4px"><b>目標：'+esc(SCN.objectives[f.id].title)+'</b>　'+esc(SCN.objectives[f.id].text)+'</div>':'');
+    b.onclick=function(){ newGame($('watch').checked?null:f.id); }; g.appendChild(b);
+  });
+  $('start').classList.add('on');
+}
+function newGame(fid){
+  var mode=(document.querySelector('input[name=mode]:checked')||{}).value||'historical';
+  var dif=(document.querySelector('input[name=diff]:checked')||{}).value||'normal';
+  var goal=(document.querySelector('input[name=goal]:checked')||{}).value||'objective';
+  S=E.createGame(SCN,{playerFaction:fid,seed:+$('seed').value||1180,mode:mode,difficulty:dif,goal:goal});
+  seenLog=S.log.length; $('start').classList.remove('on'); setSpeed(0); home(); sel=null; command=null; render();
+  toast('マップの自軍をクリックして選び、行き先をクリックすると進軍できます。出陣・徴兵は左の「軍勢」タブ、普請・外交などは各タブから。スペースキーで時間を進める／止める。', true, 7000);
+}
+$('newBtn').onclick=function(){ setSpeed(0); startScreen(); };
+$('loadFromStart').onclick=function(){ $('start').classList.remove('on'); $('savemodal').classList.add('on'); };
+
+// ================================================================ 時間
+var SPD=[0,900,260,60];
+var lastSpeed=1, tickCost=0;
+// 時間の進行：1日ぶんの処理と描画が終わってから次を予約する（重い場面でもクリックやキーが必ず通るように）
+function setSpeed(v){ speed=v; if(v>0) lastSpeed=v; [].forEach.call(document.querySelectorAll('#speed button'),function(b){b.classList.toggle('on',+b.dataset.s===v);}); if(timer) clearTimeout(timer); timer=null; if(v>0) timer=setTimeout(loopTick,Math.min(SPD[v],200)); }
+function loopTick(){ timer=null; if(!S||!speed) return; var t0=performance.now(); tick(); tickCost=performance.now()-t0; if(speed>0&&!timer) timer=setTimeout(loopTick,Math.max(SPD[speed]-tickCost, tickCost*0.5+16)); }
+[].forEach.call(document.querySelectorAll('#speed button'),function(b){ var go=function(e){ if(e){ e.preventDefault(); } if(S) setSpeed(+b.dataset.s); b.blur(); }; b.addEventListener('pointerdown',go); b.onclick=function(e){ e.preventDefault(); }; });
+// 連続アニメーション：1日の移動を、次の更新までの間に街道に沿って滑らかに動かす
+var anim=null;
+function snapshotMovers(){
+  var snap={};
+  Object.keys(S.armies).forEach(function(id){ var a=S.armies[id]; if(a.status==='marching'||a.status==='retreating'||a.edge) snap['a'+id]=armyRoutePts(a); });
+  Object.keys(S.envoys).forEach(function(id){ var v=S.envoys[id]; var pos=v.edge?along(roadPts(S.roads[v.edge.road],v.edge.from),Math.min(1,v.edge.done/v.edge.km)):{x:S.provinces[v.province].x,y:S.provinces[v.province].y}; var pts=[[pos.x,pos.y]]; if(v.edge){ var rp=roadPts(S.roads[v.edge.road],v.edge.from), t=Math.min(1,v.edge.done/v.edge.km), L=0, seg=[]; for(var i=1;i<rp.length;i++){ seg.push(Math.hypot(rp[i][0]-rp[i-1][0],rp[i][1]-rp[i-1][1])); L+=seg[i-1]; } var acc=0; for(var j=0;j<seg.length;j++){ acc+=seg[j]; if(acc>L*t) pts.push(rp[j+1]); } pts=pts.concat(routePoints(v.edge.to,v.path.slice(1))); } else pts=pts.concat(routePoints(v.province,v.path)); snap['e'+id]=pts; });
+  return snap;
+}
+function cumLen(pts){ var c=[0]; for(var i=1;i<pts.length;i++) c.push(c[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])); return c; }
+function projectOn(pts,cum,x,y){ var best=0,bd=1e9; for(var i=1;i<pts.length;i++){ var ax=pts[i-1][0],ay=pts[i-1][1],bx=pts[i][0],by=pts[i][1],dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy||1e-9,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/l2)),px=ax+dx*t,py=ay+dy*t,d=Math.hypot(px-x,py-y); if(d<bd){ bd=d; best=cum[i-1]+Math.sqrt(l2)*t; } } return {dist:best,err:bd}; }
+function pointAt(pts,cum,dd){ for(var i=1;i<pts.length;i++){ if(cum[i]>=dd){ var f=(dd-cum[i-1])/((cum[i]-cum[i-1])||1); return {x:pts[i-1][0]+(pts[i][0]-pts[i-1][0])*f,y:pts[i-1][1]+(pts[i][1]-pts[i-1][1])*f,dx:pts[i][0]-pts[i-1][0]}; } } var n=pts.length-1; return {x:pts[n][0],y:pts[n][1],dx:1}; }
+function startAnim(snap,dur){
+  var items={};
+  Object.keys(snap).forEach(function(key){ var pts=snap[key]; if(pts.length<2) return; var id=key.slice(1), cur;
+    if(key[0]==='a'){ var a=S.armies[id]; if(!a) return; cur=armyPos(a); } else { var v=S.envoys[id]; if(!v) return; cur=v.edge?along(roadPts(S.roads[v.edge.road],v.edge.from),Math.min(1,v.edge.done/v.edge.km)):{x:S.provinces[v.province].x,y:S.provinces[v.province].y}; }
+    var cum=cumLen(pts), pr=projectOn(pts,cum,cur.x,cur.y); if(pr.err>15||pr.dist<0.3) return;
+    items[key]={pts:pts,cum:cum,dist:pr.dist}; });
+  anim={t0:performance.now(),dur:dur,items:items};
+  if(Object.keys(items).length) requestAnimationFrame(animFrame);
+}
+function animFrame(now){
+  if(!anim) return; var t=Math.min(1,(now-anim.t0)/anim.dur), k=K();
+  Object.keys(anim.items).forEach(function(key){ var it=anim.items[key], p=pointAt(it.pts,it.cum,it.dist*t), el;
+    if(key[0]==='a'){ el=document.querySelector('[data-army="'+key.slice(1)+'"]'); if(el) el.setAttribute('transform','translate('+p.x+' '+p.y+') scale('+(p.dx<0?-k:k)+' '+k+')'); }
+    else { el=document.querySelector('[data-envoy="'+key.slice(1)+'"]'); if(el) el.setAttribute('transform','translate('+(p.x-6*k)+' '+(p.y+5*k)+') scale('+k+')'); } });
+  if(t<1) requestAnimationFrame(animFrame); else anim=null;
+}
+function advanceAnimated(dur){
+  var snap=snapshotMovers(); var r=E.advanceDay(S);
+  if(S.date.d===1) autosave();
+  render(true); startAnim(snap,dur); animFrame(performance.now());
+  return r;
+}
+function tick(){ if(!S) return; if(S.flags.gameOver){ setSpeed(0); return; } var r=advanceAnimated(SPD[speed]*0.95); if(r.blocked||r.stops.length) setSpeed(0); showStops(); }
+$('step1').onclick=function(){ if(!S) return; setSpeed(0); advanceAnimated(700); showStops(); };
+$('stepM').onclick=function(){ if(!S) return; setSpeed(0); E.runUntilMonthEnd(S); autosave(); render(); showStops(); };
+function autosave(){ try{ localStorage.setItem('genpei_autosave',E.save(S)); }catch(e){} }
+document.addEventListener('keyup',function(e){ if((e.key===' '||e.code==='Space')&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) e.preventDefault(); },true); // ボタンにフォーカスがあってもスペースで押されないように
+document.addEventListener('keydown',function(e){ if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||!S) return;
+  if(e.key===' '||e.code==='Space'){ e.preventDefault(); if(e.repeat) return; if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); setSpeed(speed?0:lastSpeed); } if(e.key==='.') $('step1').click(); if(e.key==='Escape'){ cancelCommand(); hidePop(); } });
+
+// ================================================================ イベント（自動停止）
+function showStops(){
+  var ev=S.pendingStops.filter(function(e){return !e.shown;})[0]||S.pendingStops.filter(function(e){return !e.resolved;})[0];
+  if(!ev){ $('evmodal').classList.remove('on'); return; }
+  $('evTitle').textContent=ev.title;
+  $('evMeta').textContent=ev.date+(ev.place?'　場所：'+ev.place:'')+((ev.persons||[]).length?'　関係人物：'+ev.persons.map(pnm).join('、'):'');
+  $('evBody').innerHTML=esc(ev.text).replace(/\n/g,'<br>');
+  if(ev.key==='choose_person'&&ev.candidates){ var A=function(a){return '統'+a.command+'・武'+a.valor+'・政'+a.politics+'・知'+a.intellect+'・外'+a.diplomacy;};
+    $('evBody').innerHTML+='<div style="max-height:46vh;overflow:auto;margin-top:8px">'+ev.candidates.map(function(c){ return '<div style="border-top:1px solid #e6dcc4;padding:6px 0"><b>'+esc(c.name)+'</b>'+(c.age!=null?'（'+c.age+'歳）':'')+' <span class="chip">'+esc(c.baseName)+'</span>'+(c.head?' <span class="chip gold">当主（家督）</span>':'')+(c.switchBase?' <span class="chip">分家・別家に移る</span>':'')+
+      '<div class="small">'+A(c.abilities)+'　性格：'+esc(c.personality||'—')+'　野心'+c.ambition+'</div>'+
+      '<div class="small">所領'+c.holdings+'・兵'+fmt(c.troops)+'・役職：'+esc(c.offices.length?c.offices.join('・'):'なし')+'・御家人の支持'+(c.support==null?'—':c.support)+'・継承の正統性'+(c.heirScore==null?'—':c.heirScore)+'</div>'+
+      '<div class="small muted">立場：'+esc(c.status||'—')+(c.relations.length?'　関係：'+esc(c.relations.join('、')):'')+'</div></div>'; }).join('')+'</div>';
+  }
+  var foot=$('evFoot'); foot.innerHTML='';
+  if(ev.key==='game_over'||ev.key==='victory'){
+    $('evBody').innerHTML='<div style="font-size:20px;font-weight:700;margin-bottom:8px;color:'+(ev.key==='victory'?'#9a7b12':'#8b1e1e')+'">'+(ev.key==='victory'?'🏯 天下静謐':'滅亡')+'</div>'+$('evBody').innerHTML;
+    var nb=document.createElement('button'); nb.className='btn'; nb.textContent='新しく始める'; nb.onclick=function(){ ev.shown=true; ev.resolved=true; $('evmodal').classList.remove('on'); setSpeed(0); startScreen(); }; foot.appendChild(nb);
+    var lb=document.createElement('button'); lb.className='btn sub'; lb.textContent='セーブを読み込む'; lb.onclick=function(){ ev.shown=true; ev.resolved=true; $('evmodal').classList.remove('on'); $('savemodal').classList.add('on'); }; foot.appendChild(lb);
+    var cb=document.createElement('button'); cb.className='btn sub'; cb.textContent=ev.key==='victory'?'このまま続ける':'盤面を眺める'; cb.onclick=function(){ ev.shown=true; ev.resolved=true; showStops(); render(); }; foot.appendChild(cb);
+    setSpeed(0); $('evmodal').classList.add('on'); return;
+  }
+  if(ev.choices&&ev.choices.length&&!ev.resolved){
+    ev.choices.forEach(function(c){ var b=document.createElement('button'); b.className='btn'; b.textContent=c.label; b.onclick=function(){ var r=E.resolveEvent(S,ev.id,c.id); ev.shown=true; toast((r.ok?'✓ ':'✗ ')+(r.message||r.reason), r.ok); render(); showStops(); }; foot.appendChild(b); });
+  } else {
+    var b=document.createElement('button'); b.className='btn sub'; b.textContent='了解'; b.onclick=function(){ ev.shown=true; ev.resolved=true; showStops(); render(); }; foot.appendChild(b);
+    var bs=document.createElement('button'); bs.className='btn'; bs.textContent='了解して再開'; bs.onclick=function(){ S.pendingStops.forEach(function(e){ if(!e.choices||!e.choices.length){e.shown=true;e.resolved=true;} }); showStops(); render(); if(!S.pendingStops.some(function(e){return !e.resolved;})) setSpeed(1); }; foot.appendChild(bs);
+  }
+  $('evmodal').classList.add('on');
+}
+
+// ================================================================ 地図：ズーム・パン
+var svg=$('map');
+function applyView(){ svg.setAttribute('viewBox',view.x+' '+view.y+' '+view.w+' '+view.h); }
+function fit(){ view={x:0,y:0,w:1402,h:1292}; applyView(); }
+function home(){ var r=svg.getBoundingClientRect(), asp=r.height/Math.max(1,r.width); var w=Math.min(760,640/asp); view={x:850-w/2,y:750-w*asp/2,w:w,h:w*asp}; applyView(); }
+function K(){ var r=svg.getBoundingClientRect(); var upp=Math.max(view.w/Math.max(1,r.width), view.h/Math.max(1,r.height)); return Math.max(0.04,Math.min(1.4,upp*0.95)); } // 画面上でほぼ一定の大きさ
+function zoom(f,cx,cy){ var nw=Math.max(30,Math.min(1402*1.2,view.w*f)), nh=nw*view.h/view.w; cx=cx==null?view.x+view.w/2:cx; cy=cy==null?view.y+view.h/2:cy; view.x=cx-(cx-view.x)*nw/view.w; view.y=cy-(cy-view.y)*nh/view.h; view.w=nw; view.h=nh; applyView(); scheduleRedraw(); }
+$('zin').onclick=function(){zoom(.6);}; $('zout').onclick=function(){zoom(1.6);}; $('zfit').onclick=function(){fit();scheduleRedraw();}; $('zhome').onclick=function(){home();scheduleRedraw();};
+var rafP=false; function scheduleRedraw(){ if(rafP||!S) return; rafP=true; requestAnimationFrame(function(){ rafP=false; renderMap(true); }); }
+function svgPt(ev){ var p=svg.createSVGPoint(); p.x=ev.clientX; p.y=ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+function scrPt(x,y){ var p=svg.createSVGPoint(); p.x=x; p.y=y; var r=p.matrixTransform(svg.getScreenCTM()), w=$('mapwrap').getBoundingClientRect(); return {x:r.x-w.left,y:r.y-w.top}; }
+svg.addEventListener('wheel',function(e){
+  e.preventDefault(); var p=svgPt(e);
+  var trackpad=!e.ctrlKey&&(e.deltaX!==0||(e.deltaMode===0&&Math.abs(e.deltaY)<50&&e.deltaY%1!==0)||(e.deltaMode===0&&Math.abs(e.deltaY)<16));
+  if(trackpad){ var r=svg.getBoundingClientRect(), s2=Math.max(view.w/r.width,view.h/r.height); view.x+=e.deltaX*s2; view.y+=e.deltaY*s2; applyView(); hidePop(); scheduleRedraw(); return; }
+  if(e.ctrlKey) zoom(Math.exp(e.deltaY*0.01),p.x,p.y); else zoom(e.deltaY>0?1.18:0.85,p.x,p.y);
+},{passive:false});
+function panBy(fx,fy){ view.x+=view.w*fx; view.y+=view.h*fy; applyView(); scheduleRedraw(); }
+document.addEventListener('keydown',function(e){ if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||!S) return; var m={ArrowLeft:[-.15,0],ArrowRight:[.15,0],ArrowUp:[0,-.15],ArrowDown:[0,.15],a:[-.15,0],d:[.15,0],w:[0,-.15],s:[0,.15]}[e.key]; if(m){ e.preventDefault(); panBy(m[0],m[1]); } if(e.key==='+'||e.key==='=') zoom(.75); if(e.key==='-') zoom(1.35); });
+var drag=null, pinch=null, pointers={};
+svg.addEventListener('pointerdown',function(e){ if(e.button===0||e.button===1||e.pointerType!=='mouse'){ try{ svg.setPointerCapture(e.pointerId); }catch(_){} } if(e.button===1) e.preventDefault(); pointers[e.pointerId]={x:e.clientX,y:e.clientY}; drag={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y,moved:false}; if(Object.keys(pointers).length===2){ var ps=Object.values(pointers); pinch={d:Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y),w:view.w}; } });
+window.addEventListener('pointermove',function(e){
+  if(pointers[e.pointerId]) pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+  if(pinch&&Object.keys(pointers).length===2){ var ps=Object.values(pointers), d=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y); zoom((pinch.w*pinch.d/d)/view.w); drag.moved=true; return; }
+  if(drag){ var r=svg.getBoundingClientRect(), s=Math.max(view.w/r.width,view.h/r.height), dx=(e.clientX-drag.x)*s, dy=(e.clientY-drag.y)*s; if(Math.abs(dx)+Math.abs(dy)>4*s) drag.moved=true; if(drag.moved){ view.x=drag.vx-dx; view.y=drag.vy-dy; applyView(); hidePop(); } }
+  else if(e.target===svg||svg.contains(e.target)) hoverMap(e);
+});
+window.addEventListener('pointerup',function(e){ delete pointers[e.pointerId]; if(Object.keys(pointers).length<2) pinch=null; if(drag&&drag.moved) scheduleRedraw(); setTimeout(function(){drag=null;},0); });
+svg.addEventListener('contextmenu',function(e){ e.preventDefault(); cancelCommand(); hidePop(); });
+svg.addEventListener('dblclick',function(e){ e.preventDefault(); var p=svgPt(e); zoom(.6,p.x,p.y); });
+[].forEach.call(document.querySelectorAll('#layers input[data-l]'),function(c){ c.onchange=function(){ $(c.dataset.l).style.display=c.checked?'':'none'; }; });
+$('lblBases').onchange=function(){ renderMap(true); };
+$('layersBtn').onclick=function(){ $('layers').classList.toggle('on'); };
+$('lToggle').onclick=function(){ $('left').classList.toggle('closed'); $('lToggle').textContent=$('left').classList.contains('closed')?'▶':'◀'; };
+
+function NS(tag,attrs,parent){ var el=document.createElementNS('http://www.w3.org/2000/svg',tag); for(var k in attrs) if(attrs[k]!==undefined) el.setAttribute(k,attrs[k]); if(parent) parent.appendChild(el); return el; }
+function buildClipPaths(){ var defs=svg.querySelector('defs'); Object.keys(GEO).forEach(function(pid){ if(pid==='_coast') return; var cp=NS('clipPath',{id:'cp-'+pid},defs); NS('path',{d:GEO[pid]},cp); }); }
+
+// 街道の経路（road.path）を from 側から並べる
+function roadPts(road, from){ var p=road.path||[[S.provinces[road.a].x,S.provinces[road.a].y],[S.provinces[road.b].x,S.provinces[road.b].y]]; return road.a===from?p:p.slice().reverse(); }
+function along(pts,t){ var L=0,seg=[]; for(var i=1;i<pts.length;i++){ var d=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); seg.push(d); L+=d; } var goal=L*t; for(var j=0;j<seg.length;j++){ if(goal<=seg[j]){ var f=seg[j]?goal/seg[j]:0; return {x:pts[j][0]+(pts[j+1][0]-pts[j][0])*f,y:pts[j][1]+(pts[j+1][1]-pts[j][1])*f,dx:pts[j+1][0]-pts[j][0]}; } goal-=seg[j]; } var n=pts.length-1; return {x:pts[n][0],y:pts[n][1],dx:pts[n][0]-pts[n-1][0]}; }
+function roadOf(a,b){ var ids=S.adj[a]||[]; for(var i=0;i<ids.length;i++){ var r=S.roads[ids[i]]; if((r.a===a&&r.b===b)||(r.a===b&&r.b===a)) return r; } return null; }
+function routePoints(startProv, path, startXY){ var pts=startXY?[[startXY.x,startXY.y]]:[]; var cur=startProv; path.forEach(function(n){ var r=roadOf(cur,n); if(r) pts=pts.concat(roadPts(r,cur)); cur=n; }); return pts; }
+function armyRoutePts(a){
+  var pts=[], pos=armyPos(a);
+  if(a.edge){ var r=S.roads[a.edge.road], rp=roadPts(r,a.edge.from), t=Math.min(1,a.edge.done/a.edge.km), L=0; var segs=[]; for(var i=1;i<rp.length;i++){ segs.push(Math.hypot(rp[i][0]-rp[i-1][0],rp[i][1]-rp[i-1][1])); L+=segs[i-1]; } var acc=0, goal=L*t; pts.push([pos.x,pos.y]); for(var j=0;j<segs.length;j++){ acc+=segs[j]; if(acc>goal) pts.push(rp[j+1]); } return pts.concat(routePoints(a.edge.to,a.path.slice(1))); }
+  return [[pos.x,pos.y]].concat(routePoints(a.province,a.path));
+}
+function ptsAttr(p){ return p.map(function(q){return q[0].toFixed(1)+','+q[1].toFixed(1);}).join(' '); }
+
+// ================================================================ 描画
+var terrSig='';
+function drawTerritory(){
+  var k=K(), sig=k.toFixed(3)+'|'+Object.keys(S.provinces).map(function(pid){ var i=U.provinceInfluence(S,pid); return (i[0]?i[0].faction:'')+(i[1]&&i[1].share>i[0].share*0.75?'/'+i[1].faction:''); }).join(',');
+  if(sig===terrSig) return; terrSig=sig;
+  var g=$('gTerr'); g.innerHTML='';
+  Object.keys(S.provinces).forEach(function(pid){ var d=GEO[pid]; if(!d) return;
+    var inf=U.provinceInfluence(S,pid), a=inf[0], b=inf[1], ca=a?fcol(a.faction):'#999', con=b&&b.share>a.share*0.75;
+    NS('path',{d:d,fill:ca,'fill-opacity':.07,stroke:'none','data-prov':pid},g);
+    NS('path',{d:d,fill:'none',stroke:ca,'stroke-width':5*k,'stroke-opacity':.8,'clip-path':'url(#cp-'+pid+')','stroke-linejoin':'round',style:'pointer-events:none'},g);
+    if(con) NS('path',{d:d,fill:'none',stroke:fcol(b.faction),'stroke-width':5*k,'stroke-dasharray':(6*k)+' '+(6*k),'clip-path':'url(#cp-'+pid+')',style:'pointer-events:none'},g);
+  });
+  var gC=$('gCoast'); gC.innerHTML='';
+  Object.keys(GEO).forEach(function(pid){ if(pid!=='_coast') NS('path',{d:GEO[pid],fill:'none',stroke:'#7d8f6a','stroke-width':.8*k,'stroke-opacity':.7},gC); });
+  NS('path',{d:GEO._coast,fill:'none',stroke:'#5f7f8c','stroke-width':1.1*k,'stroke-linejoin':'round'},gC);
+  var gR=$('gRoads'); gR.innerHTML='';
+  Object.keys(S.roads).forEach(function(rid){ var r=S.roads[rid], main=/東海道|東山道|山陽道|北陸道|山陰道|南海道/.test(r.name);
+    NS('polyline',{points:ptsAttr(r.path),'class':'road'+(r.kind==='sea'?' sea':''),'stroke-width':(main?2.1:1.2)*k,'stroke-dasharray':r.kind==='sea'?(4*k)+' '+(3*k):(r.kind==='mountain'?(6*k)+' '+(1.5*k):undefined)},gR); });
+}
+var mapSig=''; var ARMY_CLUSTERS={};
+function renderMap(force){
+  if(!S) return;
+  drawTerritory();
+  var k=K();
+  var sig=k.toFixed(3)+'|'+JSON.stringify(Object.keys(S.corps||{}).map(function(c){var x=S.corps[c];return [x.hq,x.remote,Object.keys(S.armies).filter(function(a){return S.armies[a].corps===c;}).length];}))+'|'+Object.keys(S.factions).map(function(f){return S.factions[f].capital;}).join(',')+'|'+$('lblBases').checked+'|'+(sel?sel.type+sel.id:'')+'|'+(S.playerFaction?F(S.playerFaction).capital:'')+'|'+Object.keys(S.bases).map(function(b){return S.bases[b].owner+(S.bases[b].burned?'x':'');}).join(',')+'|'+Object.keys(S.constructions||{}).map(function(c){var x=S.constructions[c];return c+Math.round(x.progress/x.required*20)+(x.paused?'p':'');}).join(',');
+  if(!force&&sig===mapSig){ renderDynamic(); return; } mapSig=sig;
+  var placed=[]; function hit(b){ for(var i=0;i<placed.length;i++){ var q=placed[i]; if(b.x<q.x+q.w&&b.x+b.w>q.x&&b.y<q.y+q.h&&b.y+b.h>q.y) return true; } return false; }
+  var gP=$('gProv'); gP.innerHTML='';
+  Object.keys(S.provinces).forEach(function(pid){ var p=S.provinces[pid];
+    NS('circle',{cx:p.x,cy:p.y,r:2*k,fill:'#2b2418',opacity:.5},gP);
+    var lb=NS('text',{x:p.lx,y:p.ly,'text-anchor':'middle','class':'plabel','font-size':13*k,'stroke-width':3*k},gP); lb.textContent=p.name; placed.push({x:p.lx-p.name.length*6.5*k,y:p.ly-12*k,w:p.name.length*13*k,h:15*k}); });
+  Object.keys(S.bases).forEach(function(bid){ var b=S.bases[bid]; placed.push({x:b.x-7*k,y:b.y-8*k,w:14*k,h:15*k}); });
+  var gB=$('gBases'); gB.innerHTML=''; var showL=$('lblBases').checked&&K()<0.5;
+  Object.keys(S.bases).forEach(function(bid){
+    var b=S.bases[bid], g=NS('g',{'class':'base','data-base':bid,transform:'translate('+b.x+' '+b.y+') scale('+k+')'},gB), c=fcol(b.owner);
+    if(b.type==='寺社') NS('path',{d:'M-6 -4 h12 M-4.5 -4 v9 M4.5 -4 v9 M-7.5 -6.5 q7.5 -3 15 0',stroke:b.burned?'#555':c,'stroke-width':2.4,fill:'none','stroke-linecap':'round'},g);
+    else if(b.type==='港'){ NS('circle',{r:6,fill:'#fff',stroke:c,'stroke-width':1.6},g); NS('path',{d:'M0 -4 v8 M-3.5 1 q3.5 4 7 0 M-2 -2.5 h4',stroke:'#1f3a56','stroke-width':1.5,fill:'none'},g); }
+    else if(b.type==='都'||b.type==='御所'){ NS('rect',{x:-6,y:-6,width:12,height:12,fill:'#fff',stroke:c,'stroke-width':2.8},g); NS('rect',{x:-2.5,y:-2.5,width:5,height:5,fill:c},g); }
+    else if(b.type==='城') NS('path',{d:'M-7 6 L-7 -1 L-4 -1 L-4 -4 L-1.5 -4 L-1.5 -8 L1.5 -8 L1.5 -4 L4 -4 L4 -1 L7 -1 L7 6 Z',fill:c,stroke:'#111','stroke-width':1},g);
+    else if(b.type==='国府') NS('path',{d:'M-7 5 L-7 -1 L0 -7 L7 -1 L7 5 Z',fill:'#fff',stroke:c,'stroke-width':2.4},g);
+    else NS('path',{d:'M-6 5 L-6 -1 L0 -6.5 L6 -1 L6 5 Z',fill:c,stroke:'#111','stroke-width':1},g);
+    var capOf=b.owner&&S.factions[b.owner]&&S.factions[b.owner].capital===bid&&b.owner!=='court';
+    if(capOf){ var own=S.playerFaction&&b.owner===S.playerFaction, en=S.playerFaction&&!own&&U.atWar(S,S.playerFaction,b.owner);
+      if(own){ NS('circle',{r:13,fill:'rgba(201,162,39,.18)',stroke:'#c9a227','stroke-width':2.6},g); NS('circle',{r:9.5,fill:'none',stroke:'#c9a227','stroke-width':1.2},g); }
+      else { var vs=campRel(b.owner)==='vassal'; NS('circle',{r:11.5,fill:'none',stroke:en?'#8b1e1e':(vs?REL_COL.vassal:c),'stroke-width':vs?2.4:2,'stroke-dasharray':en||vs?'':'3 2'},g); }
+      { var vs2=!own&&campRel(b.owner)==='vassal', tg=own?'★ 本拠':(en?'敵本拠':(vs2?'御家人':'本拠')), tw=tg.length*8+8;
+        NS('rect',{x:-tw/2,y:-25,width:tw,height:12,rx:2,fill:own?'#c9a227':(en?'#8b1e1e':(vs2?REL_COL.vassal:c)),stroke:'#fff','stroke-width':.8,opacity:own||en||vs2?1:.85},g);
+        var tt=NS('text',{x:0,y:-16.3,'text-anchor':'middle','font-size':8.5,'font-weight':700,fill:own?'#1f1a14':'#fff'},g); tt.textContent=tg; } }
+    if(!capOf&&b.owner&&campRel(b.owner)==='vassal') NS('circle',{r:9.5,fill:'none',stroke:REL_COL.vassal,'stroke-width':1.8},g);
+    if(sel&&sel.type==='base'&&sel.id===bid) NS('circle',{r:12,fill:'none',stroke:'#c9a227','stroke-width':2.5},g);
+    NS('circle',{r:10,fill:'transparent'},g);
+    if(showL){ var fs=10.5*k, w=b.name.length*fs*1.02, hh=fs*1.25, cands=[[b.x+8*k,b.y+3.5*k,'start'],[b.x-8*k,b.y+3.5*k,'end'],[b.x,b.y-9*k,'middle'],[b.x,b.y+15*k,'middle']];
+      for(var ci=0;ci<cands.length;ci++){ var c0=cands[ci], bx=c0[2]==='start'?c0[0]:c0[2]==='end'?c0[0]-w:c0[0]-w/2, box={x:bx,y:c0[1]-fs,w:w,h:hh};
+        if(!hit(box)){ placed.push(box); var brl=campRel(b.owner), l=NS('text',{x:c0[0],y:c0[1],'text-anchor':c0[2],'class':'blabel','font-size':fs,'stroke-width':2.6*k},gB); if(brl==='own'||brl==='vassal'||brl==='enemy') l.style.fill=REL_COL[brl]; l.textContent=b.name; break; } } }
+  });
+  if(S.playerFaction){ var shown={}; var capB=F(S.playerFaction).capital;
+    Object.keys(S.bases).sort(function(a,b){ return (b===capB)-(a===capB); }).forEach(function(bid){ var b=S.bases[bid]; if(b.owner!==S.playerFaction||shown[b.province]) return; shown[b.province]=1;
+      var av=U.availableBandTroops(S,S.playerFaction,b.province); if(av<1) return; var txt='⚔'+fmt(av), w=(txt.length*6+8);
+      var g=NS('g',{transform:'translate('+b.x+' '+b.y+') scale('+k+')',style:'pointer-events:none'},gB);
+      NS('rect',{x:-w/2,y:9,width:w,height:12,rx:6,fill:'#1f1a14',opacity:.85},g); var t=NS('text',{x:0,y:18.3,'text-anchor':'middle','font-size':9,fill:'#ffe9a8','font-weight':700},g); t.textContent=txt; });
+  }
+  // 本陣に残っている総大将
+  Object.keys(S.corps||{}).forEach(function(cid){ var cp=S.corps[cid]; if(!cp.remote||!cp.hq||!S.bases[cp.hq]||!P(cp.commander)||!P(cp.commander).alive) return; var b=S.bases[cp.hq];
+    var n=Object.keys(S.armies).filter(function(k){return S.armies[k].corps===cid;}).length, txt='総大将 '+P(cp.commander).name+'（'+n+'隊を采配）', w=txt.length*8+10;
+    var g=NS('g',{transform:'translate('+b.x+' '+b.y+') scale('+k+')',style:'pointer-events:none'},gB);
+    NS('rect',{x:-w/2,y:24,width:w,height:13,rx:3,fill:'#fff',stroke:fcol(cp.faction),'stroke-width':1.5},g); NS('rect',{x:-w/2,y:24,width:4,height:13,fill:fcol(cp.faction)},g);
+    var t=NS('text',{x:2,y:33.5,'text-anchor':'middle','font-size':9,'font-weight':700,fill:'#1f1a14'},g); t.textContent=txt; });
+  var gU=$('gBuild'); gU.innerHTML='';
+  Object.keys(S.constructions||{}).forEach(function(cid){ var c=S.constructions[cid], g=NS('g',{transform:'translate('+c.x+' '+c.y+') scale('+k+')'},gU);
+    NS('path',{d:'M-6 5 L-6 -1 L0 -6.5 L6 -1 L6 5 Z',fill:'#fff',stroke:fcol(c.faction),'stroke-width':1.6,'stroke-dasharray':'2 1.5'},g);
+    NS('path',{d:'M-8 6 L8 -7 M-8 -7 L8 6',stroke:'#7a5a2a','stroke-width':.9},g);
+    var t=NS('text',{x:0,y:15,'text-anchor':'middle','class':'blabel','font-size':9,'stroke-width':2.4},g); t.textContent=(K()<0.5?c.name+' ':'')+Math.min(100,Math.round(c.progress/c.required*100))+'%'+(c.paused?'（中断）':''); });
+  renderDynamic();
+}
+function armyPos(a){
+  if(a.edge){ var r=S.roads[a.edge.road]; return along(roadPts(r,a.edge.from),Math.min(1,a.edge.done/a.edge.km)); }
+  if(a.base&&S.bases[a.base]) return {x:S.bases[a.base].x+8*K(),y:S.bases[a.base].y-4*K(),dx:1};
+  var p=S.provinces[a.province], nx=a.path[0]?S.provinces[a.path[0]]:null; return {x:p.x+8*K(),y:p.y-6*K(),dx:nx?nx.x-p.x:1};
+}
+// 自勢力との間柄（地図の色分け）：自勢力＝青、御家人＝緑、主君・同盟＝藍、敵＝赤
+function campRel(fid){ if(!S||!S.playerFaction||!fid||!S.factions[fid]) return 'none'; var me=S.playerFaction; if(fid===me) return 'own'; var top=U.topLord(S,me);
+  if(U.topLord(S,fid)===top){ return (fid===top||S.factions[me].overlord===fid)?'lord':'vassal'; } if(U.atWar(S,me,fid)) return 'enemy'; if(U.sameCamp(S,fid,me)) return 'ally'; return 'none'; }
+var REL_COL={own:'#1d4f91',vassal:'#1e7a45',lord:'#3b3f8f',ally:'#3b3f8f',enemy:'#8b1e1e',none:'#1f1a14'};
+function renderDynamic(){
+  if(!S) return; var k=K();
+  var gRt=$('gRoute'); gRt.innerHTML='';
+  var gA=$('gArmies'); gA.innerHTML='';
+  // 近い位置にいる同じ勢力の軍勢をまとめて表示（軍団の総大将がいれば「〇〇の軍」）
+  var list=Object.keys(S.armies).map(function(aid){ var a=S.armies[aid]; return {id:aid,a:a,pos:armyPos(a)}; });
+  var clusters=[];
+  list.sort(function(x,y){ return y.a.troops-x.a.troops; }).forEach(function(it){
+    var c=clusters.filter(function(c){ return c.faction===it.a.faction&&Math.hypot(c.x-it.pos.x,c.y-it.pos.y)<14*k; })[0];
+    if(c){ c.items.push(it); c.troops+=it.a.troops; } else clusters.push({faction:it.a.faction,x:it.pos.x,y:it.pos.y,dx:it.pos.dx,items:[it],troops:it.a.troops});
+  });
+  // 別勢力の軍が同じ地点にいれば少しずらす
+  clusters.forEach(function(c,i){ clusters.slice(0,i).forEach(function(o){ if(Math.hypot(o.x-c.x,o.y-c.y)<14*k) c.y+=22*k; }); });
+  ARMY_CLUSTERS={};
+  clusters.forEach(function(c){
+    var lead=c.items[0], corpsId=lead.a.corps, cp=corpsId&&S.corps[corpsId];
+    var head=c.items.filter(function(it){ return cp&&it.a.commander===cp.commander; })[0]||lead;
+    var a=head.a, aid=head.id; ARMY_CLUSTERS[aid]=c.items.map(function(it){return it.id;});
+    var mine=S.playerFaction&&a.faction===S.playerFaction, isSel=sel&&sel.type==='army'&&c.items.some(function(it){return it.id===sel.id;});
+    c.items.forEach(function(it){ var x=it.a; if((isSel||mine)&&x.path.length){ NS('polyline',{points:ptsAttr(armyRoutePts(x)),fill:'none',stroke:fcol(x.faction),'stroke-width':(isSel?3:1.6)*k,'stroke-dasharray':(6*k)+' '+(4*k),opacity:isSel?.95:.55,'stroke-linecap':'round'},gRt); } });
+    var n=Math.max(1,Math.min(6,Math.round(Math.log10(Math.max(10,c.troops))*2-3)));
+    var st=c.items.some(function(it){return it.a.status==='battle'||it.a.status==='siege';})?' battle':(c.items.some(function(it){return it.a.status==='marching'||it.a.status==='retreating';})?' marching':'');
+    var g=NS('g',{'class':'army'+st,'data-army':aid,transform:'translate('+c.x+' '+c.y+') scale('+(c.dx<0?-k:k)+' '+k+')'},gA);
+    if(isSel) NS('ellipse',{cx:0,cy:-3,rx:n*4.6+5,ry:12,fill:'rgba(201,162,39,.25)',stroke:'#c9a227','stroke-width':1.6},g);
+    for(var i=0;i<n;i++){ var w=NS('g',{'class':'walker',style:'animation-delay:'+(i*0.12)+'s'},g); var u=NS('use',{href:'#sold',x:-n*4.2+i*8.4-4,y:-13,width:9,height:14},w); u.style.fill=fcol(a.faction); }
+    var fx=NS('g',{transform:c.dx<0?'scale(-1 1)':''},g);
+    var nm=(a.commander&&P(a.commander)?P(a.commander).name:'')+(cp&&head.a.commander===cp.commander&&c.items.length>1?'の軍':(c.items.length>1?' ほか'+(c.items.length-1)+'隊':''));
+    var rl=a.contingentOf===S.playerFaction&&a.faction!==S.playerFaction?'vassal':campRel(a.faction), tagR=rl==='vassal'?'御 ':(rl==='own'?'':'');
+    var label=tagR+nm+'　'+fmt(c.troops), lw=label.length*7.4+12;
+    NS('rect',{x:-lw/2,y:-30,width:lw,height:14,rx:3,fill:rl==='vassal'?'rgba(226,245,232,.95)':rl==='own'?'rgba(228,238,252,.95)':rl==='enemy'?'rgba(252,235,233,.95)':'rgba(255,255,255,.92)',stroke:rl==='vassal'||rl==='own'||rl==='enemy'?REL_COL[rl]:fcol(a.faction),'stroke-width':rl==='vassal'||rl==='own'?1.8:1.4},fx);
+    NS('rect',{x:-lw/2,y:-30,width:4,height:14,fill:fcol(a.faction)},fx);
+    var lb=NS('text',{x:2,y:-19.6,'text-anchor':'middle','font-size':9.5,'font-weight':700,fill:REL_COL[rl]||'#1f1a14'},fx); lb.textContent=label;
+    if(c.items.length>1){ NS('circle',{cx:lw/2,cy:-30,r:6,fill:'#8b1e1e'},fx); var nt=NS('text',{x:lw/2,y:-26.8,'text-anchor':'middle','font-size':8,fill:'#fff','font-weight':700},fx); nt.textContent=c.items.length; }
+    NS('rect',{x:-Math.max(n*4.5+4,lw/2),y:-32,width:Math.max(n*9+8,lw),height:46,fill:'transparent'},g);
+  });
+  var gE=$('gEnvoys'); gE.innerHTML='';
+  Object.keys(S.envoys).forEach(function(vid){ var v=S.envoys[vid], pos=v.edge?along(roadPts(S.roads[v.edge.road],v.edge.from),Math.min(1,v.edge.done/v.edge.km)):{x:S.provinces[v.province].x,y:S.provinces[v.province].y};
+    var g=NS('g',{'data-envoy':vid,transform:'translate('+(pos.x-6*k)+' '+(pos.y+5*k)+') scale('+k+')'},gE); NS('use',{href:'#runner',x:-5,y:-10,width:10,height:12},g); });
+  var gBt=$('gBattles'); gBt.innerHTML='';
+  Object.keys(S.battles).forEach(function(bk){ var b=S.battles[bk], p=b.base?S.bases[b.base]:S.provinces[b.province];
+    var g=NS('g',{'class':'battle-mark',transform:'translate('+p.x+' '+p.y+') scale('+k+')'},gBt); NS('circle',{r:16,fill:'rgba(160,20,20,.18)',stroke:'#8b1e1e','stroke-width':1.5},g); NS('path',{d:'M-6 -6 L6 6 M6 -6 L-6 6',stroke:'#8b1e1e','stroke-width':2.2},g); });
+  if(command&&command.kind==='move'&&command.preview) drawPreview(command.preview);
+}
+function render(fromTick){
+  if(!S) return;
+  $('date').textContent=U.dateStr(S);
+  var pf=myF();
+  $('pf').innerHTML=(S.options.mode==='historical'?'<span class="chip gold">史実モード</span> ':'<span class="chip">自由モード</span> ')+'<span class="chip">'+esc((E.DIFFICULTY[S.options.difficulty||'normal']||{}).label||'')+'</span> '+(pf?fsw(pf.id)+esc(pf.name)+(S.player&&S.player.person&&S.persons[S.player.person]?' <span class="chip" title="操作人物">👤 '+esc(pnm(S.player.person))+(S.player.status&&S.player.status!=='在任'?'（'+esc(S.player.status)+'）':'')+'</span>':''):'観戦');
+  if($('tbUprise')) $('tbUprise').style.display=pf&&['雌伏','密謀'].indexOf(pf.status)>=0&&['yoritomo','kiso','kai'].indexOf(pf.id)>=0?'':'none';
+  renderMap(); renderLeft(fromTick); if($('right').classList.contains('open')) renderRight(); ticker();
+  if(sel&&sel.type==='army'&&!S.armies[sel.id]){ sel=null; hidePop(); }
+}
+
+// ================================================================ 直感操作：選択 → 行き先クリック
+function targetFromEvent(e){
+  var bg=e.target.closest&&e.target.closest('[data-base]'); if(bg) return {type:'base',id:bg.getAttribute('data-base')};
+  var p=svgPt(e), pid=provAt(p.x,p.y); return pid?{type:'province',id:pid,x:p.x,y:p.y}:null;
+}
+svg.addEventListener('click',function(e){
+  if(!S||(drag&&drag.moved)) return;
+  var ag=e.target.closest&&e.target.closest('[data-army]');
+  var p=svgPt(e);
+  if(command&&command.kind==='build'){ var pid=provAt(p.x,p.y); if(!pid){ toast('✗ そこは国内の陸地ではない',false); return; } var c=command; cancelCommand(); run({type:'build',province:pid,scale:c.scale,name:c.name,x:p.x,y:p.y}); return; }
+  if(command&&command.kind==='move'&&!ag){ var t=targetFromEvent(e); if(t) confirmMove(command.army,t,e); return; }
+  if(command&&command.kind==='sortieTarget'){ var t3=targetFromEvent(e); if(!t3) return; cancelCommand(); W.target={type:t3.type,id:t3.id}; W.step='sources'; W.err=''; drawSortie(); $('sortieModal').classList.add('on'); return; }
+  if(ag){ var aid=ag.getAttribute('data-army'), a=S.armies[aid]; sel={type:'army',id:aid};
+    if(S.playerFaction&&a.faction===S.playerFaction){ beginMove(aid); armyPop(aid,e); } else { cancelCommand(); infoPop('army',aid,e); }
+    ltab='select'; renderLeft(); renderDynamic(); return; }
+  var t2=targetFromEvent(e); if(!t2) { hidePop(); return; }
+  cancelCommand(); sel={type:t2.type,id:t2.id}; ltab='select'; render();
+  if(t2.type==='base') basePop(t2.id,e); else provPop(t2.id,e);
+});
+function beginMove(aid){ command={kind:'move',army:aid}; svg.classList.add('targeting'); hint('行き先をクリック（敵の拠点・敵軍のいる国なら攻撃）　右クリック／Escで取消'); }
+function cancelCommand(){ command=null; svg.classList.remove('targeting'); $('hint').style.display='none'; $('hover').style.display='none'; if(S){ $('gRoute').innerHTML=''; renderDynamic(); } }
+function hint(t){ $('hint').textContent=t; $('hint').style.display='block'; }
+var hoverT=0;
+function hoverMap(e){
+  if(!S) return; var now=Date.now(); if(now-hoverT<60) return; hoverT=now;
+  var hv=$('hover'), w=$('mapwrap').getBoundingClientRect();
+  if(command&&command.kind==='move'){
+    var t=targetFromEvent(e); if(!t){ hv.style.display='none'; return; }
+    var a=S.armies[command.army]; if(!a){ cancelCommand(); return; }
+    var dest=t.type==='base'?S.bases[t.id].province:t.id;
+    var from=a.edge?a.edge.to:a.province, path=U.findPath(S,from,dest,a.faction);
+    if(!path){ hv.style.display='none'; return; }
+    command.preview={army:a,path:path.slice(1),target:t};
+    renderDynamic();
+    var tmp={province:from,path:path.slice(1),troops:a.troops,faction:a.faction,fatigue:a.fatigue,food:a.food,edge:null};
+    var days=U.estimateDays(S,tmp)+(a.edge?Math.ceil((a.edge.km-a.edge.done)/20):0);
+    var od=E.estimateOdds(S,a.id,t.type==='base'?t:{type:'province',id:dest});
+    var name=t.type==='base'?S.bases[t.id].name:S.provinces[t.id].name;
+    hv.innerHTML='<b>'+esc(name)+'</b>へ 約'+days+'日'+(od&&od.odds!=null?'　勝算 <b>'+od.odds+'%</b>（敵 '+fmt(od.enemyTroops)+'）':'');
+    hv.style.left=(e.clientX-w.left+14)+'px'; hv.style.top=(e.clientY-w.top+14)+'px'; hv.style.display='block';
+  } else if(command&&command.kind==='build'){
+    var p=svgPt(e), pid=provAt(p.x,p.y); if(!pid){ hv.style.display='none'; return; }
+    var rt=E.buildRights(S,S.playerFaction,pid);
+    hv.innerHTML=esc(S.provinces[pid].name)+'：'+(rt.ok?'<span style="color:#9fe0a8">建設できる</span>':'<span style="color:#f3a19a">土地の権利がない（影響力'+Math.round(rt.share*100)+'%）</span>');
+    hv.style.left=(e.clientX-w.left+14)+'px'; hv.style.top=(e.clientY-w.top+14)+'px'; hv.style.display='block';
+  } else hv.style.display='none';
+}
+function drawPreview(pv){
+  var a=pv.army; if(!S.armies[a.id]) return;
+  var pos=armyPos(a), start=a.edge?a.edge.to:a.province;
+  var pts=[[pos.x,pos.y]].concat(a.edge?[[S.provinces[a.edge.to].x,S.provinces[a.edge.to].y]]:[]).concat(routePoints(start,pv.path));
+  if(pv.target.type==='base'){ var b=S.bases[pv.target.id]; pts.push([b.x,b.y]); }
+  NS('polyline',{points:ptsAttr(pts),fill:'none',stroke:'#c9a227','stroke-width':4*K(),'stroke-linecap':'round','stroke-linejoin':'round',opacity:.95},$('gRoute'));
+}
+function confirmMove(aid,t,e){
+  var a=S.armies[aid]; if(!a) return;
+  var name=t.type==='base'?S.bases[t.id].name:S.provinces[t.id].name;
+  var owner=t.type==='base'?S.bases[t.id].owner:null, enemyBase=owner&&!U.sameCamp(S,owner,a.faction);
+  var war=owner&&U.atWar(S,a.faction,owner);
+  var dest=t.type==='base'?S.bases[t.id].province:t.id;
+  var od=E.estimateOdds(S,aid,t.type==='base'?{type:'base',id:t.id}:{type:'province',id:dest});
+  var path=U.findPath(S,a.edge?a.edge.to:a.province,dest,a.faction)||[];
+  var wh=command&&command.whole&&a.corps&&S.corps[a.corps];
+  var h='<h4>'+esc(name)+'へ'+(enemyBase||(od&&od.odds!=null)?'攻め込む':'進軍')+'</h4><div class="small">'+(wh?esc(pnm(S.corps[a.corps].commander))+'の軍団全体（'+Object.keys(S.armies).filter(function(k){return S.armies[k].corps===a.corps;}).length+'隊）':esc(U.armyLabel(S,a)))+'<br>経路：'+esc([a.province].concat(path.slice(1)).map(function(p){return S.provinces[p].name;}).join('→'))+'</div>';
+  if(od&&od.odds!=null) h+=oddsHtml(od);
+  if(enemyBase&&!war) h+='<div class="small ng" style="margin-top:4px">'+esc(fnm(owner))+'とは交戦状態にない。進めば宣戦となる。</div>';
+  h+='<div class="acts"><button class="btn red" id="pGo">'+(enemyBase||(od&&od.odds!=null)?'攻撃する':'進軍する')+'</button><button class="btn sub" id="pCancel">取消</button></div>';
+  showPop(h,e);
+  var whole=command&&command.whole&&a.corps&&S.corps[a.corps];
+  $('pGo').onclick=function(){ hidePop(); cancelCommand(); if(whole) run({type:'corps_march',corps:a.corps,target:{type:t.type,id:t.id},declare:!!enemyBase}); else run({type:'march',army:aid,target:{type:t.type,id:t.id},declare:!!enemyBase}); };
+  $('pCancel').onclick=function(){ hidePop(); };
+}
+function oddsHtml(od){ var c=od.odds>=65?'ok':od.odds<40?'ng':''; return '<div class="quality"><div class="small muted">勝算（目安）</div><div class="qbig '+c+'">'+od.odds+'%</div><div class="small">敵兵 '+fmt(od.enemyTroops)+'／戦力比 '+od.ratio+'</div>'+(od.quality&&od.quality.notes.length?'<div class="small muted">'+esc(od.quality.notes.join('・'))+'</div>':'')+'</div>'; }
+function showPop(html,e){ e=e||lastEv; lastEv=e; var p=$('pop'), w=$('mapwrap').getBoundingClientRect(); p.innerHTML=html; p.style.display='block'; var x=e.clientX-w.left+12, y=e.clientY-w.top+12; if(x+p.offsetWidth>w.width-8) x=w.width-p.offsetWidth-8; if(y+p.offsetHeight>w.height-70) y=Math.max(8,w.height-p.offsetHeight-70); p.style.left=x+'px'; p.style.top=y+'px'; }
+function hidePop(){ $('pop').style.display='none'; }
+function clusterOf(aid){ return (ARMY_CLUSTERS[aid]||[aid]).filter(function(x){return S.armies[x];}); }
+function armyPop(aid,e){
+  var ids=clusterOf(aid), a=S.armies[aid], cp=a.corps&&S.corps[a.corps], tot=ids.reduce(function(t,x){return t+S.armies[x].troops;},0);
+  var h='<h4>'+(cp?esc(pnm(cp.commander))+'の軍（総大将）':esc(U.armyLabel(S,a)))+'</h4>';
+  h+='<table class="t"><tr><th>大将</th><th class="num">兵</th><th>状態</th><th></th></tr>'+ids.map(function(x){ var y=S.armies[x]; return '<tr><td>'+esc(pnm(y.commander))+(cp&&y.commander===cp.commander?' <span class="chip gold tag">総大将</span>':'')+(y.bugyo?' <span class="chip tag">奉行 '+esc(pnm(y.bugyo))+'</span>':'')+'</td><td class="num">'+fmt(y.troops)+'</td><td class="small">'+statusJa(y.status)+'</td><td><button class="btn sub sm" data-pick="'+x+'">選ぶ</button></td></tr>'; }).join('')+(ids.length>1?'<tr><td><b>合計</b></td><td class="num"><b>'+fmt(tot)+'</b></td><td></td><td></td></tr>':'')+'</table>';
+  var corpsCount=cp?Object.keys(S.armies).filter(function(k){return S.armies[k].corps===a.corps;}).length:0;
+  var mineA=S.playerFaction&&U.topLord(S,a.faction)===U.topLord(S,S.playerFaction);
+  if(cp&&cp.contingents&&cp.contingents.length&&mineA){ var lab={join:'参陣（向かっている）',late:'遅参（遅れて向かう）',refuse:'不参',joined:'合流済み','late-joined':'遅れて合流',left:'途中で離脱'};
+    h+='<div class="small" style="margin-top:4px"><b>参陣した家</b>'+cp.contingents.map(function(c){ return '<div>'+esc(c.name)+'：'+esc(lab[c.decision]||c.decision)+(c.troops?'・兵'+fmt(c.troops):'')+(c.rendezvous&&/join|late/.test(c.decision)&&!/joined/.test(c.decision)?'・合流先 '+esc(S.provinces[c.rendezvous].name)+'（あと約'+Math.max(0,c.eta-S.day)+'日）':'')+'<span class="muted" title="'+esc(c.why)+'"> ⓘ</span></div>'; }).join('')+'</div>'; }
+  if(cp&&cp.recorded) h+='<div class="small muted">軍記の記録：「'+fmt(cp.recorded.legend)+'騎」（実数はおよそ'+fmt(Math.round(cp.recorded.troops/100)*100)+'）</div>';
+  var corpsArms=cp?Object.keys(S.armies).map(function(k){return S.armies[k];}).filter(function(x){return x.corps===a.corps&&x.faction===a.faction&&!x.joinCorps;}):[];
+  if(mineA&&corpsArms.length>=2&&a.faction===S.playerFaction){ h+='<details style="margin-top:4px"><summary class="small"><b>軍団を分ける</b>（別の道から同じ目標へ）</summary>'+corpsArms.map(function(x){ return '<div class="row small" style="margin:2px 0">'+esc(pnm(x.commander))+'（'+fmt(x.troops)+'） <select data-sg="'+x.id+'">'+opt('1','第1軍団',true)+opt('2','第2軍団')+opt('3','第3軍団')+'</select></div>'; }).join('')+
+    [1,2,3].map(function(g){ return '<div class="row small" style="margin:2px 0">第'+g+'軍団の道 <select data-sr="'+g+'">'+opt('auto','最短の道',true)+Object.keys(E.ROUTES).map(function(k){return opt(k,E.ROUTES[k].label);}).join('')+'</select></div>'; }).join('')+'<button class="btn sm" id="pSplit">分けて進む</button></details>'; }
+  if(mineA){ var fd=ids.reduce(function(t,x){return t+S.armies[x].food;},0), nd=Math.max(0.01,tot*0.005), sup=E.supplyAt(S,a.faction,a.province);
+    h+='<div class="small" style="margin-top:4px">兵糧 <b>'+fmt(fd)+'</b>石（約'+Math.floor(fd/nd)+'日分）　'+(sup!=null?'<span class="ok">補給線あり</span>（拠点から'+Math.round(sup)+'km）':'<span class="ng">補給線なし</span>：現地調達のみ。尽きると逃亡が出て、6日続けば退く')+'</div>'; }
+  h+='<div class="small muted" style="margin-top:4px">そのまま地図の行き先をクリックすると'+(cp?'<b>軍団全体（'+corpsCount+'隊）</b>':'この軍勢')+'が進みます</div>';
+  h+='<div class="acts">'+(cp?'<label class="small"><input type="checkbox" id="pWhole" checked> 軍団全体で動かす</label>':'')+(a.faction===S.playerFaction&&a.status!=='retreating'?'<button class="btn red sm" id="pWd" title="行軍中・交戦中の兵を引かせる。交戦中に引くと追撃で兵を失う">退却</button>':'')+'<button class="btn sm" id="pOrg">編成</button><button class="btn sub sm" id="pDis">解散</button>'+(cp?'<button class="btn sub sm" id="pReinf">後詰めを送る</button>':'')+'</div>';
+  showPop(h,e);
+  command.whole=!!cp;
+  if($('pWhole')) $('pWhole').onchange=function(){ command&&(command.whole=this.checked); };
+  [].forEach.call(document.querySelectorAll('[data-pick]'),function(b){ b.onclick=function(){ sel={type:'army',id:b.dataset.pick}; beginMove(b.dataset.pick); command.whole=false; hidePop(); renderDynamic(); toast('「'+pnm(S.armies[b.dataset.pick].commander)+'」の部隊だけを動かします。行き先をクリック',true); }; });
+  $('pOrg').onclick=function(){ hidePop(); cancelCommand(); openOrg({army:aid}); };
+  $('pDis').onclick=function(){ hidePop(); cancelCommand(); run({type:'disband',army:aid}); };
+  if($('pWd')) $('pWd').onclick=function(){ var whole=$('pWhole')&&$('pWhole').checked&&a.corps, ids2=whole?Object.keys(S.armies).filter(function(k){return S.armies[k].corps===a.corps&&S.armies[k].faction===S.playerFaction;}):[aid];
+    if(S.armies[aid]&&S.armies[aid].battleId&&!confirm('交戦中の退却は追撃を受けて兵を失います。退却させますか？')) return;
+    hidePop(); cancelCommand(); var last=null; ids2.forEach(function(k){ if(S.armies[k]) last=run({type:'withdraw',army:k}); }); };
+  if($('pReinf')) $('pReinf').onclick=function(){ hidePop(); cancelCommand(); openSortie({join:a.corps}); };
+  if($('pSplit')) $('pSplit').onclick=function(){ var gs={}; [].forEach.call(document.querySelectorAll('[data-sg]'),function(el){ var g=el.value; (gs[g]=gs[g]||[]).push(el.getAttribute('data-sg')); });
+    var groups=Object.keys(gs).sort().map(function(g){ return {armies:gs[g],route:(document.querySelector('[data-sr="'+g+'"]')||{}).value||'auto'}; }); hidePop(); cancelCommand(); run({type:'split_corps',corps:a.corps,groups:groups}); };
+}
+function basePop(bid,e){
+  var b=S.bases[bid], mine=S.playerFaction&&b.owner===S.playerFaction;
+  var avB=mine?U.availableBandTroops(S,S.playerFaction,b.province):0;
+  var isCap=b.owner&&S.factions[b.owner]&&S.factions[b.owner].capital===bid;
+  var h='<h4>'+esc(b.name)+(isCap?(mine?' <span class="chip gold">★ 本拠点</span>':' <span class="chip red">'+esc(fnm(b.owner).replace(/（.*）/,''))+'の本拠</span>'):'')+'</h4><div class="small">'+esc(b.type)+'・'+fsw(b.owner)+esc(fnm(b.owner))+'</div>'+(mine?'<div class="quality" style="margin-top:4px;padding:6px 9px"><div class="small">出陣できる兵（'+esc(S.provinces[b.province].name)+'の武士団）</div><div class="qbig" style="font-size:20px">⚔ '+fmt(avB)+'</div><div class="small muted">守備兵 '+fmt(b.garrison)+'（拠点を守る兵・出陣しない）／防御 '+Math.round(b.defense)+'</div><div class="small muted">籠城の兵糧 '+fmt(b.food||0)+'石（約'+Math.floor((b.food||0)/Math.max(0.01,b.garrison*0.005))+'日分）。尽きると城兵が落ち、やがて開城する</div></div>':'<div class="small">守備 '+fmt(b.garrison)+'　防御 '+Math.round(b.defense)+'</div>')+'<div class="acts">'+
+    (mine?'<button class="btn sm" id="pMus">⚔ 出陣</button><button class="btn sm" id="pRec">👥 徴兵</button><button class="btn sub sm" id="pGar">守備を増やす</button><button class="btn sub sm" id="pBld">🏯 普請</button>'+(bid!==F(S.playerFaction).capital?'<button class="btn sub sm" id="pCap">★ 本拠点にする</button>':'<span class="chip gold">★ 本拠点</span>'):'')+
+    (b.type==='寺社'&&S.playerFaction?'<button class="btn sub sm" id="pDon">寄進</button>':'')+'<button class="btn sub sm" id="pDet">詳細</button></div>';
+  showPop(h,e);
+  if($('pMus')) $('pMus').onclick=function(){ hidePop(); openSortie({source:b.province}); };
+  if($('pCap')) $('pCap').onclick=function(){ hidePop(); run({type:'set_capital',base:bid}); };
+  if($('pRec')) $('pRec').onclick=function(){ hidePop(); openRecruit(b.province); };
+  if($('pGar')) $('pGar').onclick=function(){ openGarrison(bid); };
+  if($('pBld')) $('pBld').onclick=function(){ hidePop(); ltab='build'; openLeft(); renderLeft(); };
+  if($('pDon')) $('pDon').onclick=function(){ hidePop(); ltab='faction'; openLeft(); renderLeft(); var s2=$('donB'); if(s2) s2.value=bid; };
+  $('pDet').onclick=function(){ hidePop(); openLeft(); };
+}
+function provPop(pid,e){
+  var p=S.provinces[pid], inf=U.provinceInfluence(S,pid), fid=S.playerFaction;
+  var av=fid?U.availableBandTroops(S,fid,pid):0, rt=fid?E.buildRights(S,fid,pid):{ok:false}, ri=fid?E.recruitInfo(S,fid,pid):{cap:0};
+  var h='<h4>'+esc(p.name)+'国</h4><div class="bar">'+inf.map(function(x){return '<span style="width:'+(x.share*100)+'%;background:'+fcol(x.faction)+'"></span>';}).join('')+'</div><div class="small">'+inf.slice(0,3).map(function(x){return fsw(x.faction)+esc(fnm(x.faction))+' '+Math.round(x.share*100)+'%';}).join('　')+'</div><div class="acts">'+
+    (av>30?'<button class="btn sm" id="pMus">⚔ 出陣（動員可'+fmt(av)+'）</button>':'')+(ri.cap>0?'<button class="btn sm" id="pRec">👥 徴兵（あと'+fmt(ri.room)+'）</button>':'')+(rt.ok?'<button class="btn sub sm" id="pBld">🏯 普請</button>':'')+'<button class="btn sub sm" id="pDet">詳細</button></div>';
+  showPop(h,e);
+  if($('pMus')) $('pMus').onclick=function(){ hidePop(); openSortie({source:pid}); };
+  if($('pBld')) $('pBld').onclick=function(){ hidePop(); ltab='build'; openLeft(); renderLeft(); };
+  if($('pRec')) $('pRec').onclick=function(){ hidePop(); openRecruit(pid); };
+  $('pDet').onclick=function(){ hidePop(); openLeft(); };
+}
+function infoPop(type,id,e){ var a=S.armies[id]; showPop('<h4>'+esc(U.armyLabel(S,a))+'</h4><div class="small">'+fsw(a.faction)+esc(fnm(a.faction))+'<br>総大将 '+esc(pnm(a.commander))+'　'+statusJa(a.status)+(a.target?'　→'+esc(a.target.type==='base'?S.bases[a.target.id].name:S.provinces[a.target.id].name):'')+'</div>',e); }
+function openLeft(){ $('left').classList.remove('closed'); $('lToggle').textContent='◀'; }
+
+// ================================================================ 出陣・編成ダイアログ
+// ctx: {province, base} 新規出陣 / {army} 既存軍の再編成
+function retainers(fid, armyId, prov){ return Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){ return p.alive&&!p.captiveOf&&U.topLord(S,p.faction)===fid&&E.personFree(S,p.id,fid,armyId)&&(String(p.location)==='army:'+armyId||E.personNear(S,p.id,prov)); }); }
+function openOrg(ctx){
+  if(!S.playerFaction){ toast('✗ 観戦モードでは命令できない',false); return; }
+  var fid=S.playerFaction, a=ctx.army?S.armies[ctx.army]:null;
+  var org={ province: ctx.province || (a?a.province:null), troops: a?Math.round(a.troops):500, commander: a?a.commander:null,
+    divs: a?a.divisions.filter(function(d){return !d.main;}).map(function(d){return {leader:d.leader,troops:d.troops};}):[], bugyo: a?a.bugyo:null, base: ctx.base||null };
+  if(!org.province){ var bp=Object.keys(S.bands).map(function(k){return S.bands[k];}).filter(function(b){return b.faction===fid&&b.strength-b.mobilized>30;}).sort(function(x,y){return (y.strength-y.mobilized)-(x.strength-x.mobilized);})[0]; org.province=bp?bp.province:F(fid).capital&&S.bases[F(fid).capital].province; }
+  var people=retainers(fid, a?a.id:null, org.province);
+  function pLabel(p){ return p.name+'（統'+p.abilities.command+' 武'+p.abilities.valor+' 知'+p.abilities.intellect+'）'+(p.faction!==fid?'［'+fnm(p.faction).replace(/（.*）/,'')+'］':''); }
+  function draw(){
+    var avail = a? Math.round(a.troops) : U.availableBandTroops(S,fid,org.province)+neighborsAvail(org.province);
+    if(!a) org.troops=Math.min(org.troops,avail);
+    var fighters=people.filter(function(p){return p.abilities.command>=30;});
+    if(!org.commander||!fighters.some(function(p){return p.id===org.commander;})) org.commander=(fighters.slice().sort(function(x,y){return y.abilities.command-x.abilities.command;})[0]||{}).id;
+    var used=function(id,except){ return [org.commander].concat(org.divs.map(function(d){return d.leader;})).concat([org.bugyo]).filter(function(x,i,arr){return x&&x!==except;}).indexOf(id)>=0; };
+    var h='';
+    if(!a){ h+='<div class="row"><b>出陣する国</b> <select id="oProv">'+provOpts(fid,org.province)+'</select> <span class="small muted">動員できる兵（周辺国含む） '+fmt(avail)+'</span></div>'+
+      '<div class="row"><b>兵数</b> <input type="range" id="oTro" min="30" max="'+Math.max(30,avail)+'" step="10" value="'+org.troops+'" style="flex:1"> <input id="oTroN" type="number" value="'+org.troops+'" style="width:80px"></div>'; }
+    else h+='<div class="row"><b>兵数</b> '+fmt(a.troops)+'（再編成）</div>';
+    h+='<div class="small muted">任じられるのは、この国から約5日以内の場所にいる家臣（自勢力・御家人）だけ。'+(fighters.length?'':'<span class="ng">近くに武将がいない。</span>')+'</div>';
+    h+='<div class="row"><b>総大将</b> <select id="oCmd" style="flex:1">'+fighters.map(function(p){return opt(p.id,pLabel(p),p.id===org.commander);}).join('')+'</select></div>';
+    h+='<div style="margin-top:8px"><b>部隊（各部隊の大将と兵数）</b> <span class="small muted">一人の大将が率いられるのは千五百程度。総大将の本隊には残りの兵が入る。</span></div><div id="oDivs">';
+    org.divs.forEach(function(d,i){ h+='<div class="divrow"><select data-dl="'+i+'">'+fighters.filter(function(p){return !used(p.id,d.leader);}).map(function(p){return opt(p.id,pLabel(p),p.id===d.leader);}).join('')+'</select><input type="number" data-dt="'+i+'" value="'+d.troops+'"><button class="btn sub sm" data-dx="'+i+'">✕</button></div>'; });
+    var mainT=org.troops-org.divs.reduce(function(t,d){return t+(+d.troops||0);},0);
+    h+='</div><div class="row"><button class="btn sub sm" id="oAdd">＋ 部隊を加える</button><span class="small '+(mainT<0?'ng':'muted')+'">本隊（総大将直率）：'+fmt(mainT)+'</span></div>';
+    var intel=people.slice().sort(function(x,y){return y.abilities.intellect-x.abilities.intellect;});
+    h+='<div class="row" style="margin-top:8px"><b>軍奉行</b> <select id="oBug" style="flex:1"><option value="">任命しない</option>'+intel.filter(function(p){return !used(p.id,org.bugyo);}).map(function(p){return opt(p.id,p.name+'（知略'+p.abilities.intellect+'・政治'+p.abilities.politics+'）',p.id===org.bugyo);}).join('')+'</select></div>'+
+      '<div class="small muted">軍奉行は軍紀・兵站を司る。任命すると戦力が上がり（知略に応じて＋5〜15%）、疲労と兵糧の消費が減る。兵1000を超えて任命しないと −6%。</div>';
+    // 見込み
+    var tmp={faction:fid,commander:org.commander,troops:Math.max(1,org.troops),divisions:[{leader:org.commander,troops:Math.max(0,mainT),main:true}].concat(org.divs.map(function(d){return {leader:d.leader,troops:+d.troops||0};})),bugyo:org.bugyo||null};
+    var q=E.armyQuality(S,tmp);
+    h+='<div class="quality"><div class="small muted">軍の質（戦力の倍率）</div><div class="qbig">'+Math.round(q.factor*100)+'</div><div class="small">統率 '+q.lead+'・武勇 '+q.valor+(q.notes.length?'　'+esc(q.notes.join('・')):'')+'</div></div>';
+    $('orgBody').innerHTML=h;
+    var foot=$('orgFoot'); foot.innerHTML='';
+    var bAuto=document.createElement('button'); bAuto.className='btn sub'; bAuto.textContent='おまかせ編成'; bAuto.onclick=function(){ autoFill(); draw(); }; foot.appendChild(bAuto);
+    if(a){ var bOk=document.createElement('button'); bOk.className='btn'; bOk.textContent='この編成にする'; bOk.onclick=function(){ submit(false); }; foot.appendChild(bOk); }
+    else { var b1=document.createElement('button'); b1.className='btn sub'; b1.textContent='出陣（待機）'; b1.onclick=function(){ submit(false); }; foot.appendChild(b1);
+      var b2=document.createElement('button'); b2.className='btn red'; b2.textContent='出陣して行き先を選ぶ'; b2.onclick=function(){ submit(true); }; foot.appendChild(b2); }
+    var bc=document.createElement('button'); bc.className='btn sub'; bc.textContent='やめる'; bc.onclick=function(){ $('orgModal').classList.remove('on'); }; foot.appendChild(bc);
+    // bind
+    if($('oProv')) $('oProv').onchange=function(){ org.province=this.value; people=retainers(fid,null,org.province); org.divs=[]; org.commander=null; org.bugyo=null; autoFill(); draw(); };
+    if($('oTro')){ $('oTro').oninput=function(){ org.troops=+this.value; $('oTroN').value=this.value; }; $('oTro').onchange=function(){ draw(); }; $('oTroN').onchange=function(){ org.troops=+this.value; draw(); }; }
+    $('oCmd').onchange=function(){ org.commander=this.value; draw(); };
+    $('oBug').onchange=function(){ org.bugyo=this.value||null; draw(); };
+    $('oAdd').onclick=function(){ var cand=fighters.filter(function(p){return !used(p.id);}).sort(function(x,y){return y.abilities.command-x.abilities.command;})[0]; if(!cand){ toast('✗ 大将に任じられる家臣がいない',false); return; } org.divs.push({leader:cand.id,troops:Math.min(1200,Math.max(50,Math.floor(org.troops/(org.divs.length+2))))}); draw(); };
+    [].forEach.call(document.querySelectorAll('[data-dl]'),function(s2){ s2.onchange=function(){ org.divs[+s2.dataset.dl].leader=s2.value; draw(); }; });
+    [].forEach.call(document.querySelectorAll('[data-dt]'),function(s2){ s2.onchange=function(){ org.divs[+s2.dataset.dt].troops=+s2.value; draw(); }; });
+    [].forEach.call(document.querySelectorAll('[data-dx]'),function(s2){ s2.onclick=function(){ org.divs.splice(+s2.dataset.dx,1); draw(); }; });
+  }
+  function autoFill(){
+    var lead=F(fid).leader, sc=function(p){ return p.abilities.command+p.abilities.valor+(p.faction===fid?40:0)-(p.id===lead?200:0); };
+    var fighters=people.filter(function(p){return p.abilities.command>=30;}).sort(function(x,y){return sc(y)-sc(x);});
+    org.commander=(fighters[0]||{}).id; var n=Math.min(fighters.length-1,Math.floor(org.troops/1200)); org.divs=[];
+    for(var i=1;i<=n;i++) org.divs.push({leader:fighters[i].id,troops:Math.floor(org.troops/(n+1))});
+    var rest=people.filter(function(p){return p.id!==org.commander&&p.id!==lead&&!org.divs.some(function(d){return d.leader===p.id;});}).sort(function(x,y){return (y.abilities.intellect+(y.faction===fid?20:0))-(x.abilities.intellect+(x.faction===fid?20:0));});
+    org.bugyo=org.troops>300&&rest[0]?rest[0].id:null;
+  }
+  function submit(pick){
+    var divs=org.divs.map(function(d){return {leader:d.leader,troops:+d.troops||0};});
+    if(a){ var r=run({type:'organize',army:a.id,commander:org.commander,divisions:divs,bugyo:org.bugyo}); if(r.ok) $('orgModal').classList.remove('on'); return; }
+    var r2=run({type:'mobilize',province:org.province,troops:org.troops,commander:org.commander,divisions:divs,bugyo:org.bugyo,base:org.base});
+    if(r2.ok){ $('orgModal').classList.remove('on'); if(pick&&r2.army){ sel={type:'army',id:r2.army}; beginMove(r2.army); render(); } }
+  }
+  $('orgTitle').textContent=a?'軍勢の再編成：'+U.armyLabel(S,a):'出陣の編成';
+  if(!a&&!org.divs.length) autoFill();
+  draw(); $('orgModal').classList.add('on');
+}
+function neighborsAvail(pid){ var t=0; (S.adj[pid]||[]).forEach(function(rid){ var r=S.roads[rid], o=r.a===pid?r.b:r.a; t+=U.availableBandTroops(S,S.playerFaction,o); }); return t; }
+function provOpts(fid,cur){ var by={}; Object.keys(S.bands).forEach(function(k){ var b=S.bands[k]; if(b.faction===fid) by[b.province]=(by[b.province]||0)+Math.max(0,b.strength-b.mobilized); }); if(cur&&by[cur]==null) by[cur]=0; return Object.keys(by).map(function(k){return opt(k,S.provinces[k].name+'（'+fmt(by[k])+'）',k===cur);}).join(''); }
+
+// ================================================================ 出陣ウィザード
+// 1) 攻め先  2) 兵を出す拠点（複数）  3) 総兵数・総大将・各部隊の大将と兵数・軍奉行  4) 出陣
+var W=null;
+function openSortie(opt){
+  if(!S||!S.playerFaction){ toast('✗ 観戦モードでは命令できない',false); return; }
+  var fid=S.playerFaction, myCorps=Object.keys(S.corps||{}).filter(function(k){return S.corps[k].faction===fid;});
+  W={cmdSrc:null, step: opt.join?'sources':(myCorps.length&&!opt.target&&!opt.fresh?'choose':(opt.target?'sources':'target')), join:opt.join||null, target:opt.target||null, src:{}, total:null, commander:null, bugyo:null, units:[], declare:false, err:''};
+  if(opt.source) W.src[opt.source]=true;
+  if(W.join){ var cp=S.corps[W.join]; W.target=cp.target; W.commander=cp.commander; }
+  drawSortie(); $('sortieModal').classList.add('on');
+}
+function sortieErr(t){ W.err=t; drawSortie(); }
+function persons4(prov){ var fid=S.playerFaction; return Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){ return p.alive&&!p.captiveOf&&U.topLord(S,p.faction)===fid&&E.personFree(S,p.id,fid)&&p.abilities.command>=30&&E.personNear(S,p.id,prov); }).sort(function(x,y){ var f=S.playerFaction; return (y.abilities.command+y.abilities.valor+(y.faction===f?40:0)-(y.id===F(f).leader?20:0))-(x.abilities.command+x.abilities.valor+(x.faction===f?40:0)-(x.id===F(f).leader?20:0)); }); }
+function tName(t){ return t.type==='base'?S.bases[t.id].name:S.provinces[t.id].name+'国'; }
+function tProv(t){ return t.type==='base'?S.bases[t.id].province:t.id; }
+function drawSortie(){
+  var fid=S.playerFaction, f=F(fid), h='', foot=$('soFoot'); foot.innerHTML='';
+  var steps=[['target','① 攻め先'],['sources','② 兵を出す拠点'],['org','③ 兵の割り振り']];
+  $('soTitle').textContent=W.join?'後詰め（'+pnm(W.commander)+'の軍に合流）':'出陣';
+  h+='<div class="steps">'+steps.map(function(x){ return '<span class="'+(W.step===x[0]?'on':'')+'">'+x[1]+'</span>'; }).join('')+'</div>';
+  if(W.err) h+='<div class="err">✗ '+esc(W.err)+'</div>';
+  if(f.status==='雌伏'||f.status==='密謀') h+='<div class="err" style="background:#fff6df;color:#6d5214;border-color:#ead9a6">まだ挙兵していない。平家方を攻め先に選べば、その出陣がそのまま挙兵になる。</div>';
+  function btn(label,cls,fn){ var b=document.createElement('button'); b.className='btn '+(cls||''); b.textContent=label; b.onclick=fn; foot.appendChild(b); return b; }
+  if(W.step==='choose'){
+    var myCorps=Object.keys(S.corps).filter(function(k){return S.corps[k].faction===fid;});
+    h+='<div class="small">すでに出陣している軍団がある。新しく出陣するか、その軍に合流（後詰め）するかを選ぶ。</div>';
+    h+='<button class="pick" data-new="1"><b>⚔ 新しく出陣する</b><span class="r">攻め先・総大将を新たに決める</span></button>';
+    myCorps.forEach(function(cid){ var cp=S.corps[cid], ar=Object.keys(S.armies).map(function(k){return S.armies[k];}).filter(function(a){return a.corps===cid;}), tr=ar.reduce(function(t,a){return t+a.troops;},0);
+      h+='<button class="pick" data-join="'+cid+'"><b>➕ '+esc(pnm(cp.commander))+'の軍に合流（後詰め）</b><span class="r">'+ar.length+'隊・'+fmt(tr)+'／目的地 '+esc(cp.target?tName(cp.target):'—')+'</span></button>'; });
+    $('soBody').innerHTML=h;
+    [].forEach.call(document.querySelectorAll('[data-new]'),function(b){ b.onclick=function(){ W.step='target'; W.err=''; drawSortie(); }; });
+    [].forEach.call(document.querySelectorAll('[data-join]'),function(b){ b.onclick=function(){ var cp=S.corps[b.dataset.join]; W.join=b.dataset.join; W.target=cp.target; W.commander=cp.commander; W.step='sources'; W.err=''; drawSortie(); }; });
+    btn('やめる','sub',function(){ $('sortieModal').classList.remove('on'); });
+    return;
+  }
+  if(W.step==='target'){
+    var capP=f.capital?S.bases[f.capital].province:null;
+    var cand=Object.keys(S.bases).map(function(k){return S.bases[k];}).filter(function(b){ return b.id!=='heiankyo'&&b.id!=='toba'; }).map(function(b){ var en=b.owner&&!U.sameCamp(S,b.owner,fid); return {b:b,en:en,war:en&&U.atWar(S,fid,b.owner),d:capP?U.travelDays(S,capP,b.province,25):0}; });
+    var groups=[['交戦中の敵の拠点',cand.filter(function(x){return x.war;})],['その他の勢力の拠点（攻めれば宣戦）',cand.filter(function(x){return x.en&&!x.war;})],['味方・無主の拠点（集結・移動）',cand.filter(function(x){return !x.en;})]];
+    h+='<div class="row"><button class="btn red" id="soMap">🗺 地図で攻め先を選ぶ</button><span class="small muted">または一覧から</span></div>';
+    groups.forEach(function(g){ if(!g[1].length) return; h+='<div style="margin-top:8px"><b class="small">'+g[0]+'</b></div>'+g[1].sort(function(a,b){return a.d-b.d;}).slice(0,14).map(function(x){ return '<button class="pick'+(W.target&&W.target.id===x.b.id?' on':'')+'" data-t="'+x.b.id+'">'+fsw(x.b.owner)+'<b>'+esc(x.b.name)+'</b><span class="small muted">'+esc(S.provinces[x.b.province].name)+'・'+esc(fnm(x.b.owner))+'</span><span class="r">守備 '+fmt(x.b.garrison)+'<br>本拠から約'+x.d+'日</span></button>'; }).join(''); });
+    $('soBody').innerHTML=h;
+    $('soMap').onclick=function(){ $('sortieModal').classList.remove('on'); command={kind:'sortieTarget'}; svg.classList.add('targeting'); hint('攻め先（拠点または国）をクリック　右クリック／Escで取消'); };
+    [].forEach.call(document.querySelectorAll('[data-t]'),function(b){ b.onclick=function(){ W.target={type:'base',id:b.dataset.t}; W.step='sources'; W.err=''; drawSortie(); }; });
+    btn('やめる','sub',function(){ $('sortieModal').classList.remove('on'); });
+    return;
+  }
+  var tp=tProv(W.target), srcs=E.sortieSources(S,fid);
+  if(W.step==='sources'){
+    h+='<div class="quality" style="margin-bottom:8px"><span class="small muted">攻め先</span> <b>'+esc(tName(W.target))+'</b>'+(W.target.type==='base'?' <span class="small">（'+esc(fnm(S.bases[W.target.id].owner))+'・守備'+fmt(S.bases[W.target.id].garrison)+'）</span>':'')+(W.join?'':' <button class="btn sub sm" id="soBackT">変更</button>')+'</div>';
+    h+='<div class="small">兵を出す拠点（国の武士団）を選ぶ。<b>複数選べる。</b>各部隊はそれぞれの拠点から攻め先へ向かい、そこで合流して戦う。</div>';
+    if(!srcs.length) h+='<div class="err">出陣できる兵がいない。先に徴兵を。</div>';
+    var sum=0;
+    srcs.forEach(function(x){ var d=U.travelDays(S,x.province,tp,25), on=!!W.src[x.province]; if(on) sum+=x.available; var ps=persons4(x.province);
+      h+='<button class="pick'+(on?' on':'')+'" data-s="'+x.province+'"><input type="checkbox" '+(on?'checked':'')+' style="pointer-events:none"><div><b>'+esc(x.label)+'</b><div class="small muted">率いられる武将：'+(ps.length?esc(ps.slice(0,4).map(function(p){return p.name;}).join('・'))+(ps.length>4?' ほか':''):'<span class="ng">いない</span>')+'</div></div><span class="r"><b style="font-size:15px;color:var(--ink)">⚔ '+fmt(x.available)+'</b><br>攻め先まで約'+d+'日</span></button>'; });
+    h+='<div class="quality" style="margin-top:8px">選んだ拠点の兵の合計　<span class="qbig">'+fmt(sum)+'</span></div>';
+    $('soBody').innerHTML=h;
+    if($('soBackT')) $('soBackT').onclick=function(){ W.step='target'; drawSortie(); };
+    [].forEach.call(document.querySelectorAll('[data-s]'),function(b){ b.onclick=function(){ var k=b.dataset.s; if(W.src[k]) delete W.src[k]; else W.src[k]=true; W.err=''; drawSortie(); }; });
+    btn('戻る','sub',function(){ W.step=W.join?'choose':'target'; drawSortie(); });
+    var nx=btn('次へ：兵の割り振り','red',function(){ if(!Object.keys(W.src).length) return sortieErr('兵を出す拠点を一つ以上選ぶこと'); W.step='org'; W.err=''; autoUnits(); drawSortie(); }); nx.disabled=!Object.keys(W.src).length;
+    return;
+  }
+  // ---- org
+  var avail={}; srcs.forEach(function(x){ avail[x.province]=x.available; });
+  var maxSum=Object.keys(W.src).reduce(function(t,k){return t+(avail[k]||0);},0);
+  if(W.total==null||W.total>maxSum) W.total=maxSum;
+  W.units=W.units.filter(function(u){ return W.join||u.leader!==W.commander; });
+  var assigned=W.units.reduce(function(t,u){return t+(+u.troops||0);},0);
+  var remain=W.join?0:W.total-assigned;
+  h+='<div class="quality" style="margin-bottom:6px"><span class="small muted">攻め先</span> <b>'+esc(tName(W.target))+'</b>　<span class="small muted">出せる兵の合計</span> <b>'+fmt(maxSum)+'</b></div>';
+  h+='<div class="row"><b>総兵数</b> <input type="range" id="soTot" min="10" max="'+Math.max(10,maxSum)+'" step="10" value="'+W.total+'" style="flex:1"><input id="soTotN" type="number" value="'+W.total+'" style="width:90px"><button class="btn sub sm" id="soAuto">この総数で割り振り直す</button></div>';
+  var allNear=[]; Object.keys(W.src).forEach(function(k){ persons4(k).forEach(function(p){ if(allNear.indexOf(p)<0) allNear.push(p); }); });
+  var capB=F(fid).capital?S.bases[F(fid).capital]:null;
+  if(!W.join){
+    var cands=allNear.slice(); if(capB) Object.keys(S.persons).map(function(k){return S.persons[k];}).forEach(function(p){ if(cands.indexOf(p)<0&&p.alive&&!p.captiveOf&&U.topLord(S,p.faction)===fid&&E.personFree(S,p.id,fid)&&p.abilities.command>=30&&E.personNear(S,p.id,capB.province)) cands.push(p); });
+    h+='<div class="row"><b>総大将</b> <select id="soCmd" style="flex:1">'+cands.map(function(p){ return opt(p.id,p.name+'（統'+p.abilities.command+' 武'+p.abilities.valor+'）'+(p.faction!==fid?'［御家人］':''),p.id===W.commander); }).join('')+'</select></div>';
+  } else h+='<div class="row"><b>総大将</b> '+esc(pnm(W.commander))+'（合流先）</div>';
+  h+='<div style="margin-top:6px"><b>部隊</b> <span class="small muted">拠点ごとに大将と兵数を決める。一人で千五百を超えると統率が落ちる。</span></div>';
+  h+='<div class="unit small muted"><span>出る拠点</span><span>大将</span><span>兵数</span><span></span></div>';
+  W.units.forEach(function(u,i){ var ps=persons4(u.province), used=W.units.map(function(x){return x.leader;}).concat(W.bugyo?[W.bugyo]:[]).concat(W.join?[]:[W.commander]);
+    h+='<div class="unit"><span>'+esc(S.provinces[u.province].name)+'<span class="small muted">（⚔'+fmt(avail[u.province])+'）</span></span><select data-ul="'+i+'"><option value="">（大将を選ぶ）</option>'+ps.filter(function(p){ return p.id===u.leader||used.indexOf(p.id)<0; }).map(function(p){ return opt(p.id,p.name+'（統'+p.abilities.command+'）',p.id===u.leader); }).join('')+'</select><input type="number" data-ut="'+i+'" value="'+u.troops+'"><button class="btn sub sm" data-ux="'+i+'">✕</button></div>'; });
+  if(!W.join){
+    var cmdSrcs=Object.keys(W.src).filter(function(k){ return persons4(k).some(function(p){return p.id===W.commander;}); });
+    if(W.cmdSrc!=='stay'&&cmdSrcs.indexOf(W.cmdSrc)<0) W.cmdSrc=cmdSrcs[0]||'stay';
+    var srcUsed=W.units.filter(function(u){return u.province===W.cmdSrc;}).reduce(function(t,u){return t+(+u.troops||0);},0);
+    var room=W.cmdSrc==='stay'?0:(avail[W.cmdSrc]||0)-srcUsed;
+    var staying=W.cmdSrc==='stay'||remain<=0;
+    h+='<div class="unit" style="background:#fbf3dc;border-radius:6px;padding:4px"><span><select id="soCmdSrc">'+cmdSrcs.map(function(k){return opt(k,S.provinces[k].name+'から出る',k===W.cmdSrc);}).join('')+opt('stay','出陣しない（本陣に残る）',W.cmdSrc==='stay')+'</select></span><span><b>'+esc(pnm(W.commander))+'</b>【総大将】</span><span class="num"><b>'+fmt(Math.max(0,W.cmdSrc==='stay'?0:remain))+'</b></span><span></span></div>';
+    h+='<div class="small '+(remain<0||(!staying&&remain>room)?'ng':'muted')+'">総大将の兵＝総兵数 − 各部隊の兵（残り）。'+(remain<0?'部隊に割り振った兵が総兵数を超えている。':(staying?'<b>総大将は出陣せず、'+esc(capB?capB.name:'本陣')+'に残って采配する</b>（統率の効果は半分）。'+(W.cmdSrc==='stay'&&remain>0?'残り'+fmt(remain)+'は出陣しない。':''):(remain>room?esc(S.provinces[W.cmdSrc].name)+'から出せる残りは'+fmt(room)+'まで。':'総大将は'+esc(S.provinces[W.cmdSrc].name)+'から自分の部隊を率いて出陣する。')))+'</div>';
+  }
+  h+='<div class="row">'+Object.keys(W.src).map(function(k){ return '<button class="btn sub sm" data-ua="'+k+'">＋ '+esc(S.provinces[k].name)+'から部隊を追加</button>'; }).join('')+'<span class="small muted">部隊 '+fmt(assigned)+(W.join?'':'＋総大将 '+fmt(Math.max(0,W.cmdSrc==='stay'?0:remain)))+'／総兵数 '+fmt(W.total)+'</span></div>';
+  if(!W.join){ var bu=W.cmdSrc!=='stay'&&remain>0?W.cmdSrc:(W.units.slice().sort(function(a,b){return b.troops-a.troops;})[0]||{}).province;
+    var bp=bu?Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return p.alive&&!p.captiveOf&&U.topLord(S,p.faction)===fid&&E.personFree(S,p.id,fid)&&E.personNear(S,p.id,bu)&&p.id!==W.commander&&!W.units.some(function(u){return u.leader===p.id;});}):[];
+    h+='<div class="row" style="margin-top:6px"><b>軍奉行</b> <select id="soBug" style="flex:1"><option value="">任命しない</option>'+bp.sort(function(x,y){return y.abilities.intellect-x.abilities.intellect;}).map(function(p){ return opt(p.id,p.name+'（知略'+p.abilities.intellect+'）',p.id===W.bugyo); }).join('')+'</select></div><div class="small muted">軍奉行は総大将の部隊に同行する（総大将が残るときは最大の部隊に同行）。同じ国にいる軍団の全部隊に効く（知略に応じて＋5〜15%）。兵1000超で不在なら −6%。</div>'; }
+  // 見込み
+  var cmdT=W.join||W.cmdSrc==='stay'?0:Math.max(0,remain), sendT=assigned+cmdT;
+  var tmp={faction:fid,commander:W.commander,troops:Math.max(1,sendT),divisions:[{leader:W.commander,troops:cmdT,main:true}].concat(W.units.filter(function(u){return u.leader;}).map(function(u){return {leader:u.leader,troops:+u.troops||0};})),bugyo:W.join?(S.corps[W.join].bugyo):W.bugyo,mission:'attack'};
+  var q=E.armyQuality(S,tmp); if(!W.join&&cmdT<=0){ q.factor*=0.94; q.notes=q.notes.concat(['総大将は本陣から采配']); } var od=E.oddsFor(S,fid,sendT,q.factor,W.target);
+  h+='<div class="quality" style="display:flex;gap:18px;flex-wrap:wrap"><div><div class="small muted">軍の質</div><div class="qbig">'+Math.round(q.factor*100)+'</div><div class="small">'+esc(q.notes.join('・'))+'</div></div>'+(od?'<div><div class="small muted">全軍がそろった時の勝算（目安・参陣の兵は含まない）</div><div class="qbig '+(od.odds>=65?'ok':od.odds<40?'ng':'')+'">'+od.odds+'%</div><div class="small">敵 '+fmt(od.enemyTroops)+'</div></div>':'')+'<div><div class="small muted">到着</div>'+(cmdT>0?'<div class="small">'+esc(pnm(W.commander))+'（総大将）：約'+U.travelDays(S,W.cmdSrc,tp,25)+'日</div>':'')+W.units.map(function(u){ return '<div class="small">'+esc(pnm(u.leader)||'—')+'：約'+U.travelDays(S,u.province,tp,25)+'日</div>'; }).join('')+'</div></div>';
+  var tb=W.target.type==='base'?S.bases[W.target.id]:null;
+  var rises=!W.join&&E.risesBy(S,fid,W.target);
+  if(rises) h+='<div class="quality" style="border-color:#8b1e1e;background:#fbecec"><b>⚑ この出陣が挙兵となる</b><div class="small">平家方を攻めるので、出陣と同時に挙兵し平家と交戦状態に入る（別に「挙兵」を命じる必要はない）。挙兵の直後は'+(F(fid).flags.ryoji?'令旨を掲げて':'')+'地元の武士が呼応して集まり、しばらく攻め手に<b>奇襲の利（+35%）</b>がつく。近隣の平家方が兵を集めて来るまでには日数がかかる。</div></div>';
+  else if(tb&&tb.owner&&!U.sameCamp(S,tb.owner,fid)&&!U.atWar(S,fid,tb.owner)) h+='<label class="err" style="display:block"><input type="checkbox" id="soDecl" '+(W.declare?'checked':'')+'> '+esc(fnm(tb.owner))+'とは交戦状態にない。宣戦して攻める</label>';
+  var rets=!W.join?E.retainersOf(S,fid):[];
+  if(rets.length) h+='<div class="quality" style="margin-top:6px"><label><input type="checkbox" id="soCall" '+(W.call!==false?'checked':'')+'> <b>家臣の家・御家人に参陣を命じる</b></label> <label class="small"><input type="checkbox" id="soWait" '+(W.wait!==false?'checked':'')+'> 参陣を待って進む</label><div class="small muted">各家が忠誠・大義・恩賞の見込み・距離・本領への脅威・兵糧・ほかの家の参陣を見て、参陣／遅参／不参を決める。参陣した兵は合流地点で本隊に加わる（少数で出ても大軍になりうる）。</div><div class="row small" style="margin:4px 0">🏹 先陣を任せる：<select id="soSenjin">'+opt('','（任せない）',!W.senjin)+rets.map(function(r){ return opt(r.id,(r.kind==='house'?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,'')),W.senjin===r.id); }).join('')+'</select></div><div class="small muted">先陣は坂東武者の名誉。任された家は参陣しやすくなり、勝てば功名を上げる（忠誠が上がり奉公が加わる）。</div><div class="small">'+rets.map(function(r){ return esc(r.kind==='house'?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,''))+'（忠誠'+Math.round(E.retLoyalty(S,r,fid))+'・兵'+fmt(r.kind==='house'?E.houseTroops(S,r.id):U.factionPower(S,r.id).available)+'）'; }).join('　')+'</div></div>';
+  $('soBody').innerHTML=h;
+  var setTot=function(v){ W.total=Math.max(10,Math.min(maxSum,+v||0)); };
+  $('soTot').oninput=function(){ $('soTotN').value=this.value; }; $('soTot').onchange=function(){ setTot(this.value); autoUnits(true); drawSortie(); };
+  $('soTotN').onchange=function(){ setTot(this.value); autoUnits(true); drawSortie(); };
+  $('soAuto').onclick=function(){ autoUnits(true); drawSortie(); };
+  if($('soCmd')) $('soCmd').onchange=function(){ W.commander=this.value; W.units=W.units.filter(function(u){return u.leader!==W.commander;}); W.cmdSrc=null; drawSortie(); };
+  if($('soCmdSrc')) $('soCmdSrc').onchange=function(){ W.cmdSrc=this.value; drawSortie(); };
+  if($('soBug')) $('soBug').onchange=function(){ W.bugyo=this.value||null; drawSortie(); };
+  if($('soDecl')) $('soDecl').onchange=function(){ W.declare=this.checked; };
+  if($('soCall')) $('soCall').onchange=function(){ W.call=this.checked; };
+  if($('soWait')) $('soWait').onchange=function(){ W.wait=this.checked; };
+  if($('soSenjin')) $('soSenjin').onchange=function(){ W.senjin=this.value||null; };
+  [].forEach.call(document.querySelectorAll('[data-ul]'),function(x){ x.onchange=function(){ W.units[+x.dataset.ul].leader=x.value||null; drawSortie(); }; });
+  [].forEach.call(document.querySelectorAll('[data-ut]'),function(x){ x.onchange=function(){ W.units[+x.dataset.ut].troops=Math.max(0,+x.value||0); drawSortie(); }; });
+  [].forEach.call(document.querySelectorAll('[data-ux]'),function(x){ x.onclick=function(){ W.units.splice(+x.dataset.ux,1); drawSortie(); }; });
+  [].forEach.call(document.querySelectorAll('[data-ua]'),function(x){ x.onclick=function(){ var used=W.units.map(function(u){return u.leader;}); var p=persons4(x.dataset.ua).filter(function(p){return used.indexOf(p.id)<0&&p.id!==W.bugyo;})[0]; if(!p) return sortieErr(S.provinces[x.dataset.ua].name+'の近くに、他に大将にできる武将がいない'); W.units.push({province:x.dataset.ua,leader:p.id,troops:100}); W.err=''; drawSortie(); }; });
+  btn('戻る','sub',function(){ W.step='sources'; W.err=''; drawSortie(); });
+  btn('⚔ 出陣','red',function(){
+    var cmd={type:'sortie',senjin:W.call!==false?(W.senjin||null):null,call:W.call!==false,waitCall:W.wait!==false,faction:fid,target:W.target,join:W.join,commander:W.commander,bugyo:W.join?null:W.bugyo,units:W.units.map(function(u){return {province:u.province,leader:u.leader,troops:+u.troops||0};}),declare:W.declare||E.risesBy(S,fid,W.target),
+      commanderUnit:W.join?null:{province:W.cmdSrc==='stay'?null:W.cmdSrc,troops:W.cmdSrc==='stay'?0:Math.max(0,remain)}};
+    if(!W.join&&remain<0) return sortieErr('部隊に割り振った兵（'+assigned+'）が総兵数（'+W.total+'）を超えている');
+    var r=E.issueCommand(S,cmd);
+    if(!r.ok) return sortieErr(r.reason);
+    $('sortieModal').classList.remove('on'); toast('✓ '+r.message,true,7000); render(); showStops();
+  });
+}
+function autoUnits(keepLeaders){
+  var fid=S.playerFaction, avail={}; E.sortieSources(S,fid).forEach(function(x){ avail[x.province]=x.available; });
+  var keys=Object.keys(W.src).filter(function(k){return avail[k];}), maxSum=keys.reduce(function(t,k){return t+avail[k];},0);
+  if(W.total==null||W.total>maxSum) W.total=maxSum;
+  if(!W.join&&(!W.commander||!(function(){ var p=P(W.commander); return p&&p.alive&&E.personFree(S,W.commander,fid); })())){ var best=null; keys.forEach(function(k){ var p=persons4(k)[0]; if(p&&(!best||p.abilities.command>best.abilities.command)) best=p; }); W.commander=best?best.id:null; }
+  if(!W.join){ var cs=keys.filter(function(k){ return persons4(k).some(function(p){return p.id===W.commander;}); }); if(W.cmdSrc!=='stay'&&cs.indexOf(W.cmdSrc)<0) W.cmdSrc=cs[0]||'stay'; }
+  var old=W.units, used=W.join?[]:[W.commander]; W.units=[]; var sent=0;
+  keys.forEach(function(k){
+    var share=Math.round(W.total*avail[k]/maxSum/10)*10;
+    var cmdHere=!W.join&&W.cmdSrc===k, cmdTake=cmdHere?Math.min(1500,share):0;
+    var rest=share-cmdTake, ps=persons4(k).filter(function(p){return used.indexOf(p.id)<0;});
+    var prev=keepLeaders?old.filter(function(u){return u.province===k&&u.leader&&used.indexOf(u.leader)<0;}).map(function(u){return u.leader;}):[];
+    var need=rest>0?Math.max(1,Math.ceil(rest/1500)):0, leads=prev.slice(0,Math.max(need,prev.length?1:0));
+    ps.forEach(function(p){ if(leads.length<need&&leads.indexOf(p.id)<0) leads.push(p.id); });
+    if(rest>0&&!leads.length){ if(cmdHere){ cmdTake=Math.min(avail[k],share); rest=0; } }
+    leads.forEach(function(l,i,arr){ used.push(l); var t=Math.min(avail[k]-cmdTake,Math.round(rest/arr.length/10)*10); W.units.push({province:k,leader:l,troops:t}); sent+=t; });
+    sent+=cmdTake;
+  });
+  if(sent<W.total) W.total=Math.max(10,sent); // 率いる大将がいない拠点の分は出せない
+  // 端数の調整：部隊の合計が（総兵数−総大将の兵）を超えないように
+  var over=sent-W.total; for(var i=W.units.length-1;i>=0&&over>0;i--){ var d=Math.min(over,W.units[i].troops); W.units[i].troops-=d; over-=d; }
+  if(!W.join){ var bu=W.cmdSrc!=='stay'?W.cmdSrc:(W.units.slice().sort(function(a,b){return b.troops-a.troops;})[0]||{}).province; if(bu){ var bp=Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return p.alive&&!p.captiveOf&&U.topLord(S,p.faction)===fid&&E.personFree(S,p.id,fid)&&E.personNear(S,p.id,bu)&&used.indexOf(p.id)<0&&p.id!==F(fid).leader;}).sort(function(x,y){return y.abilities.intellect-x.abilities.intellect;}); if(!W.bugyo||used.indexOf(W.bugyo)>=0) W.bugyo=W.total>300&&bp[0]?bp[0].id:null; } }
+}
+
+// ================================================================ 徴兵ダイアログ
+function openRecruit(pid){
+  var fid=S.playerFaction, f=F(fid);
+  var provs={}; Object.keys(S.holdings).forEach(function(k){ var h=S.holdings[k]; if(h.controller===fid) provs[h.province]=1; }); Object.keys(S.bases).forEach(function(k){ if(S.bases[k].owner===fid) provs[S.bases[k].province]=1; });
+  var list=Object.keys(provs).map(function(k){ return {pid:k, info:E.recruitInfo(S,fid,k)}; }).sort(function(a,b){ return b.info.room-a.info.room; });
+  if(!list.length){ toast('✗ 所領・拠点のある国がない',false); return; }
+  if(!pid||!provs[pid]) pid=list[0].pid;
+  function draw(){
+    var info=E.recruitInfo(S,fid,pid), max=Math.max(0,Math.min(info.room,Math.floor(f.money/info.costPer),Math.floor(f.food/info.foodPer)));
+    var cur=Math.min(+(($('recN')||{}).value||Math.min(max,200)),max);
+    var h='<div class="row"><b>国</b> <select id="recP">'+list.map(function(x){ return opt(x.pid,S.provinces[x.pid].name+'（あと'+fmt(x.info.room)+'人）',x.pid===pid); }).join('')+'</select></div>'+
+      '<dl class="kv" style="margin:8px 0"><dt>今の武士団</dt><dd>'+fmt(info.current)+'人'+(info.pending?'（募集中 '+fmt(info.pending)+'）':'')+'</dd><dt>この国の上限</dt><dd>'+fmt(info.cap)+'人 <span class="small muted">（所領の種類と石高・拠点で決まる）</span></dd><dt>費用</dt><dd>1人あたり '+info.costPer+'貫・兵糧'+info.foodPer+'石</dd><dt>所持</dt><dd>'+fmt(f.money)+'貫・'+fmt(f.food)+'石</dd></dl>';
+    if(max<10) h+='<div class="ng">この国ではこれ以上集められない（上限に達しているか、資金・兵糧が足りない）。</div>';
+    else h+='<div class="row"><b>人数</b> <input type="range" id="recR" min="10" max="'+max+'" step="10" value="'+cur+'" style="flex:1"> <input id="recN" type="number" value="'+cur+'" style="width:80px"></div><div class="small muted" id="recCost"></div>';
+    $('recBody').innerHTML=h;
+    var upd=function(){ var n=+$('recN').value; $('recCost').textContent='費用 '+Math.round(n*info.costPer)+'貫・兵糧'+Math.round(n*info.foodPer)+'石／約'+(20+Math.round(n/40))+'日かけて集まる'; };
+    if($('recR')){ $('recR').oninput=function(){ $('recN').value=this.value; upd(); }; $('recN').oninput=upd; upd(); }
+    $('recP').onchange=function(){ pid=this.value; draw(); };
+    var ft=$('recFoot'); ft.innerHTML='';
+    var b=document.createElement('button'); b.className='btn red'; b.textContent='徴兵する'; b.disabled=max<10; b.onclick=function(){ var r=run({type:'recruit',province:pid,amount:+$('recN').value}); if(r.ok) $('recModal').classList.remove('on'); }; ft.appendChild(b);
+    var c=document.createElement('button'); c.className='btn sub'; c.textContent='やめる'; c.onclick=function(){ $('recModal').classList.remove('on'); }; ft.appendChild(c);
+  }
+  draw(); $('recModal').classList.add('on');
+}
+function openGarrison(bid){
+  var b=S.bases[bid], av=U.availableBandTroops(S,S.playerFaction,b.province);
+  showPop('<h4>'+esc(b.name)+'の守備を増やす</h4><div class="small">この国の武士団から守備兵に回す（動員できる兵 '+fmt(av)+'）。守備 '+fmt(b.garrison)+'</div><div class="row"><input type="number" id="garN" value="'+Math.min(av,200)+'" style="width:90px"><button class="btn sm" id="garGo">回す</button></div>',lastEv);
+  $('garGo').onclick=function(){ hidePop(); run({type:'garrison',base:bid,amount:+$('garN').value}); };
+}
+var lastEv=null;
+
+// ================================================================ 命令
+function run(cmd){ cmd.faction=S.playerFaction; var r=E.issueCommand(S,cmd); toast(r.ok?'✓ '+r.message:'✗ '+r.reason, r.ok); render(); showStops(); return r; }
+var toastT=null;
+function toast(t,ok,ms){ var el=$('toast'); el.textContent=t; el.className=ok?'':'ng'; el.style.display='block'; clearTimeout(toastT); toastT=setTimeout(function(){el.style.display='none';},ms||(ok?4500:6500)); }
+$('helpBtn').onclick=function(){ $('help').classList.add('on'); };
+[].forEach.call(document.querySelectorAll('[data-act]'),function(b){ b.onclick=function(){
+  var act=b.dataset.act;
+  if(act==='history'){ ltab='history'; openLeft(); renderLeft(); return; }
+  if(!S||!S.playerFaction){ toast('✗ 観戦モードでは命令できない',false); return; }
+  if(act==='muster') return openSortie({});
+  if(act==='recruit') return openRecruit(null);
+  if(act==='uprise') return run({type:'uprising'});
+  ltab=act; openLeft(); renderLeft();
+}; });
+
+// ================================================================ 左パネル
+[].forEach.call(document.querySelectorAll('#ltabs button'),function(b){ var go=function(e){ if(e&&e.button>0) return; if(ltab===b.dataset.t&&e&&e.type==='click') return; ltab=b.dataset.t; renderLeft(); $('lbody').scrollTop=0; }; b.addEventListener('pointerdown',go); b.onclick=go; });
+function setTabs(id,cur){ [].forEach.call(document.querySelectorAll('#'+id+' button'),function(b){ b.classList.toggle('on',b.dataset.t===cur); }); }
+function statusJa(s){ return {idle:'待機',marching:'行軍中',gathering:'集結中',battle:'交戦中',siege:'攻囲中',retreating:'退却中',arrived:'到着'}[s]||s; }
+function campOf(fid){ return U.topLord(S,fid); }
+function renderLeft(fromTick){
+  if(!S) return; setTabs('ltabs',ltab);
+  if(fromTick){ var ae=document.activeElement; if(ae&&$('left').contains(ae)&&/INPUT|SELECT|TEXTAREA/.test(ae.tagName)) return; }
+  var h='', f=myF(), fid=S.playerFaction, fn=TABS[ltab]; h=fn?fn(f,fid):'';
+  $('lbody').innerHTML=h; bindLeft();
+}
+var TABS={};
+function regimeCard(f,fid){
+  var r=E.regimeOf(S,fid); if(!r) return '';
+  var bar=function(lab,v,good,tip){ var c=good?(v>=60?'#3f7d3a':v>=35?'#b58a1b':'#a33'):(v<=40?'#3f7d3a':v<=65?'#b58a1b':'#a33'); return '<div class="hbar" title="'+esc(tip)+'"><span>'+lab+'</span><div class="bar"><i style="width:'+Math.round(v)+'%;background:'+c+'"></i></div><b class="num">'+Math.round(v)+'</b></div>'; };
+  var heir=f.heir&&P(f.heir)&&P(f.heir).alive?P(f.heir):null, ls=r.lastSuccession;
+  var h='<div class="card"><h3>🏛 政権の体制</h3><div class="small muted">目標：'+esc(r.goal||'')+'。'+esc(r.note||'')+'（'+esc(r.confidence||'')+'）</div>'+
+    bar('当主依存',r.leaderDep,false,'当主個人の力に頼る度合い。高いと当主の死で揺らぐ')+bar('組織成熟',r.maturity,true,'機構・制度・御家人関係の整い方')+bar('後継安定',r.heirStab,true,'後継者が決まり、力量・年齢・基盤があるか')+
+    bar('家臣結束',r.cohesion,true,'勝ち負け・恩賞・内紛で動く')+bar('権力集中',r.central,false,'高すぎると家臣の不満、低すぎると統制が弱い')+bar('地方統制',r.local,true,'支配国の不穏・地頭・問注所')+bar('正統性',f.legitimacy,true,'令旨・院宣・宣旨・官位')+bar('外交能力',r.diplomacy,true,'当主と家臣の外交力・朝廷との関係');
+  if(f.flags.strifeUntil>S.day) h+='<div class="err small">家中が割れている（あと'+(f.flags.strifeUntil-S.day)+'日）。合戦の質 −6%。「家臣団の対立を調整する」で早く収まる。</div>';
+  if(ls) h+='<div class="small">前回の家督継承：'+esc(ls.date)+' '+esc(pnm(ls.from))+'→'+esc(pnm(ls.to))+'（'+({stable:'安定',strife:'派閥争い',revolt:'内乱',split:'分裂'}[ls.kind])+'・判定'+ls.score+'）</div>';
+  var cands=Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return p.alive&&p.faction===fid&&p.id!==f.leader&&!p.captiveOf;}).sort(function(a,b){return E.heirScore(S,f,b)-E.heirScore(S,f,a);}).slice(0,12);
+  h+='<div class="row" style="margin-top:6px"><b>後継者</b> <select id="heirSel">'+(heir?'':'<option value="">（未定）</option>')+cands.map(function(p){return opt(p.id,p.name+'（'+(p.born?(S.date.y-p.born)+'歳・':'')+'評価'+Math.round(E.heirScore(S,f,p))+'）',heir&&p.id===heir.id);}).join('')+'</select><button class="btn sub sm" id="bHeir">定める</button></div>';
+  h+='<div class="small muted">当主が死ぬと、後継者の力量・後継安定・組織成熟・結束・当主依存・外敵の強さで継承の行方（安定／派閥争い／内乱／分裂）が決まる。</div>';
+  h+='<div style="margin-top:6px"><b>体制の施策</b>（同じ施策は2か月に一度）</div>'+Object.keys(E.REGIME_ACTS).map(function(k){ var d=E.REGIME_ACTS[k]; return '<div class="row" style="margin:3px 0"><button class="btn sub sm" data-rg="'+k+'" '+(f.money<d.money?'disabled':'')+'>'+esc(d.label)+'（'+d.money+'貫）</button><span class="small muted">'+esc(d.desc)+'</span></div>'; }).join('');
+  var hs=E.regimeHouses(S,fid); if(hs.length) h+='<div style="margin-top:6px"><b>政権の中の有力者</b> <span class="small muted">（家＝勢力の内側の一族、御家人＝従う勢力）</span></div>'+hs.map(function(x){ return '<div class="hbar"><span>'+esc(x.name)+'</span><div class="bar"><i style="width:'+Math.min(100,Math.round(x.influence))+'%;background:#7a5c2e"></i></div><b class="num">'+Math.round(x.influence)+'</b></div><div class="small muted" style="margin:-4px 0 2px">'+esc(x.kind)+'・当主 '+esc(pnm(x.head))+'</div>'; }).join('');
+  return h+'</div>';
+}
+function goalCard(){
+  if(!S.playerFaction) return '';
+  var g=S.options.goal||'unify'; if(g==='unify') return unifyCard();
+  if(g==='none') return '<div class="card"><h3>🎌 目的</h3><div class="small muted">勝利条件なし（自由プレイ）。自家の拠点をすべて失うと滅亡。</div></div>';
+  var st=E.objectiveStatus(S); if(!st) return '';
+  var n=st.rows.filter(function(r){return r.ok;}).length;
+  var h='<div class="card"><h3>🎌 目標：'+esc(st.title)+'</h3><div class="small muted">'+esc(st.text)+'</div>';
+  if(st.victory) h+='<div class="ok"><b>ゲームクリア</b>（'+esc(S.flags.victoryDate||'')+'）。このまま遊び続けられる。</div>';
+  h+=st.rows.map(function(r){ return '<div class="small" style="margin-top:3px">'+(r.ok?'<span class="ok">✔</span>':'<span class="muted">□</span>')+' '+esc(r.label)+(r.progress?' <span class="muted">（'+esc(r.progress)+'）</span>':'')+'</div>'; }).join('');
+  h+='<div class="hbar" style="margin-top:4px"><span>達成</span><div class="bar"><i style="width:'+Math.round(n/st.rows.length*100)+'%;background:#c9a227"></i></div><b class="num">'+n+'／'+st.rows.length+'</b></div>';
+  var mine=Object.keys(S.bases).filter(function(k){return S.bases[k].owner===S.playerFaction;}).length;
+  if(mine<=1&&!st.victory) h+='<div class="err small" style="margin-top:4px">自家の拠点は残り'+mine+'。これを失えば滅亡する。</div>';
+  return h+'</div>';
+}
+function unifyCard(){
+  if(!S.playerFaction||!E.unifyStatus) return '';
+  var u=E.unifyStatus(S), pct=Math.round(u.mine/Math.max(1,u.total)*100), h='<div class="card"><h3>🏯 天下統一への道</h3>';
+  if(u.victory) h+='<div class="ok"><b>ゲームクリア</b>（'+esc(S.flags.victoryDate||'')+'に天下を定めた）。このまま遊び続けられる。</div>';
+  else if(u.unified){ var left=u.need-u.held, y=Math.floor(left/354), m=Math.floor(left%354/29.5);
+    h+='<div><b>天下統一を維持中</b>（'+esc(u.sinceDate||'')+'から）</div><div class="hbar"><span>維持</span><div class="bar"><i style="width:'+Math.round(u.held/u.need*100)+'%;background:#c9a227"></i></div><b class="num">'+Math.round(u.held/u.need*100)+'%</b></div><div class="small">あと約'+(y?y+'年':'')+m+'か月、一つの拠点も失わずに保てばゲームクリア。</div>'; }
+  else { h+='<div class="hbar"><span>拠点</span><div class="bar"><i style="width:'+pct+'%;background:'+fcol(S.playerFaction)+'"></i></div><b class="num">'+u.mine+'／'+u.total+'</b></div><div class="small muted">寺社と朝廷（都・御所）を除く全拠点を自家と家臣で押さえると「天下統一」。そこから5年保てばクリア。自家の拠点をすべて失うと滅亡。</div>';
+    var rest=u.rest.map(function(k){return S.bases[k];}).filter(Boolean); if(rest.length&&rest.length<=8) h+='<div class="small">残り：'+rest.map(function(b){return fsw(b.owner)+esc(b.name);}).join('、')+'</div>'; }
+  var mine=Object.keys(S.bases).filter(function(k){return S.bases[k].owner===S.playerFaction;}).length;
+  if(mine<=1&&!u.victory) h+='<div class="err small" style="margin-top:4px">自家の拠点は残り'+mine+'。これを失えば滅亡する。</div>';
+  return h+'</div>';
+}
+TABS.overview=function(f,fid){
+  // 陣営（主従をまとめた単位）ごとの集計
+  var camps={};
+  Object.keys(S.factions).forEach(function(k){ var x=S.factions[k]; if(!x.alive||k==='court') return; var c=campOf(k), p=U.factionPower(S,k);
+    camps[c]=camps[c]||{id:c,members:[],avail:0,field:0,gar:0,bases:0,prov:0,money:0,food:0};
+    var o=camps[c]; o.members.push(k); o.avail+=p.available; o.field+=p.field; o.gar+=p.garrison; o.money+=x.money; o.food+=x.food; });
+  Object.keys(S.bases).forEach(function(k){ var b=S.bases[k]; if(b.owner&&camps[campOf(b.owner)]) camps[campOf(b.owner)].bases++; });
+  Object.keys(S.provinces).forEach(function(pid){ var i=U.provinceInfluence(S,pid)[0]; if(i&&camps[campOf(i.faction)]) camps[campOf(i.faction)].prov++; });
+  var arr=Object.keys(camps).map(function(k){var o=camps[k]; o.total=o.avail+o.field+o.gar; return o;}).sort(function(a,b){return b.total-a.total;});
+  var max=Math.max.apply(null,arr.map(function(o){return o.total;}).concat([1]));
+  var all=arr.reduce(function(t,o){return t+o.total;},0), field=arr.reduce(function(t,o){return t+o.field;},0);
+  var wars=[]; var ids=Object.keys(S.factions).filter(function(k){return S.factions[k].alive&&k!=='court'&&campOf(k)===k;});
+  ids.forEach(function(a,i){ ids.slice(i+1).forEach(function(b){ if(U.atWar(S,a,b)) wars.push([a,b]); }); });
+  var h=goalCard();
+  h+='<div class="card"><h3>天下の情勢　'+esc(U.dateStr(S).replace(/（.*）/,''))+'</h3><dl class="kv"><dt>全国の兵</dt><dd><b>'+fmt(all)+'</b>（うち出陣中 '+fmt(field)+'）</dd><dt>進行中の合戦</dt><dd>'+(Object.keys(S.battles).map(function(k){return esc(S.battles[k].name);}).join('、')||'なし')+'</dd><dt>都</dt><dd>'+esc(S.bases[S.court.location].name)+'（朝廷の主導：'+esc(fnm(U.courtController(S))||'—')+'）</dd><dt>朝敵</dt><dd>'+(Object.keys(S.factions).filter(function(k){return S.factions[k].alive&&S.factions[k].flags.choteki;}).map(fnm).map(esc).join('、')||'なし')+'</dd></dl></div>';
+  h+='<div class="card"><h3>陣営別の兵力（主従をまとめた総兵力）</h3>'+arr.filter(function(o){return o.total>0;}).slice(0,12).map(function(o){ return '<div class="hbar"><span>'+fsw(o.id)+esc(fnm(o.id).replace(/（.*）/,''))+'</span><div class="b" style="width:'+(o.total/max*100)+'%;background:'+fcol(o.id)+'"></div><span class="num">'+fmt(o.total)+'</span></div>'; }).join('')+'<div class="small muted">動員可能な武士団・出陣中の軍・拠点の守備兵の合計（推定値）</div></div>';
+  h+='<div class="card"><h3>陣営の内訳</h3><table class="t"><tr><th>陣営</th><th class="num">出陣</th><th class="num">動員可</th><th class="num">守備</th><th class="num">拠点</th><th class="num">優勢な国</th></tr>'+arr.filter(function(o){return o.total>0;}).map(function(o){ return '<tr'+(fid&&o.id===campOf(fid)?' style="background:#fbf3dc"':'')+'><td>'+fsw(o.id)+esc(fnm(o.id).replace(/（.*）/,''))+(o.members.length>1?'<div class="small muted">＋'+(o.members.length-1)+'勢力</div>':'')+'<div class="small muted">'+esc(F(o.id).status)+'</div></td><td class="num">'+fmt(o.field)+'</td><td class="num">'+fmt(o.avail)+'</td><td class="num">'+fmt(o.gar)+'</td><td class="num">'+o.bases+'</td><td class="num">'+o.prov+'</td></tr>'; }).join('')+'</table></div>';
+  h+='<div class="card"><h3>交戦中の陣営</h3>'+(wars.length?wars.map(function(w){return '<div>'+fsw(w[0])+esc(fnm(w[0]))+' <span class="ng">⚔</span> '+fsw(w[1])+esc(fnm(w[1]))+'</div>';}).join(''):'<div class="muted">なし</div>')+'</div>';
+  var armies=Object.keys(S.armies).map(function(k){return S.armies[k];}).sort(function(a,b){return b.troops-a.troops;}).slice(0,10);
+  h+='<div class="card"><h3>主な軍勢</h3>'+(armies.length?'<table class="t">'+armies.map(function(a){return '<tr><td>'+fsw(a.faction)+esc(U.armyLabel(S,a))+'</td><td class="small">'+esc(S.provinces[a.province].name)+(a.target?'→'+esc(a.target.type==='base'?S.bases[a.target.id].name:S.provinces[a.target.id].name):'')+'</td><td class="small">'+statusJa(a.status)+'</td></tr>';}).join('')+'</table>':'<div class="muted">出陣している軍はない</div>')+'</div>';
+  if(S.options.mode==='historical'){ var up=S.schedule.filter(function(e){return !e.done;}).slice(0,5); if(up.length) h+='<div class="card"><h3>これからの史実</h3>'+up.map(function(e){return '<div class="small">'+e.date[1]+'月'+e.date[3]+'日　'+esc(e.title)+'</div>';}).join('')+'<div class="small muted">条件が崩れていれば起こらない</div></div>'; }
+  return h;
+};
+TABS.history=function(f,fid){
+  var st=E.histEventStatus(S), filt=window._hf||'all';
+  var lab={done:'発生済み',pending:'未発生',asked:'選択待ち',expired:'起こらなかった',declined:'見送った'};
+  var cnt={done:0,pending:0,other:0}; st.forEach(function(e){ if(e.status==='done') cnt.done++; else if(e.status==='pending') cnt.pending++; else cnt.other++; });
+  var h='<div class="card"><h3>史実イベント（'+st.length+'）</h3><div class="small">条件がすべてそろうと発生する。'+(S.options.mode==='historical'?'史実モード：史実の日付から期限までの間に条件がそろえば発生。':'自由モード：期限なし。他家は条件がそろってもすぐには動かない。')+'自分の家が当事者のときは「史実どおりにするか」を選べる。</div>'+
+    '<div class="row"><select id="hfSel">'+opt('all','すべて',filt==='all')+opt('pending','未発生（条件の確認）',filt==='pending')+opt('done','発生済み',filt==='done')+opt('other','起こらなかった・見送り',filt==='other')+'</select><span class="small muted">発生済 '+cnt.done+'／未発生 '+cnt.pending+'／不発 '+cnt.other+'</span></div></div>';
+  st.filter(function(e){ return filt==='all'||(filt==='done'&&e.status==='done')||(filt==='pending'&&e.status==='pending')||(filt==='other'&&['expired','declined'].indexOf(e.status)>=0); }).forEach(function(e){
+    var cls=e.status==='pending'&&e.ready?'ready':e.status;
+    h+='<div class="card hev '+cls+'"><h3>'+esc(e.name)+' <span class="chip">'+esc(e.category)+'</span> <span class="chip '+(e.status==='done'?'green':e.status==='pending'?'gold':'red')+'">'+(lab[e.status]||e.status)+'</span></h3>'+
+      '<div class="small muted">史実：'+esc(e.date)+(e.actor?'　当事者：'+esc(fnm(e.actor)):'')+(e.firedDate?'　発生：'+esc(e.firedDate.replace(/（.*）/,'')):'')+(e.note?'（'+esc(e.note)+'）':'')+'</div><div class="small">'+esc(e.summary)+'</div>'+
+      (e.status==='pending'?'<div style="margin-top:4px"><b class="small">発生条件</b>'+e.conds.map(function(c){ return '<div class="cond '+(c.ok?'y':'n')+'">'+esc(c.label)+'</div>'; }).join('')+'</div>':'')+'</div>';
+  });
+  return h;
+};
+TABS.faction=function(f,fid){
+  if(!f) return '<div class="card">観戦モードです。</div>';
+  var pw=U.factionPower(S,fid), h='';
+  h+='<div class="card"><h3>'+fsw(fid)+esc(f.name)+'</h3><dl class="kv"><dt>状態</dt><dd>'+esc(f.status)+(f.flags.choteki?' <span class="chip red">朝敵</span>':'')+(f.flags.ryoji?' <span class="chip gold">令旨</span>':'')+(f.flags.bakufu?' <span class="chip gold">武家政権</span>':'')+'</dd><dt>当主</dt><dd>'+esc(pnm(f.leader))+'</dd><dt>本拠</dt><dd>'+esc(f.capital?S.bases[f.capital].name:'なし（流浪）')+'</dd>'+(f.overlord?'<dt>主君</dt><dd>'+esc(fnm(f.overlord))+'</dd>':'')+
+    '<dt>資金</dt><dd>'+fmt(f.money)+' 貫'+(f.lastIncome?' <span class="small muted">（前月 +'+fmt(f.lastIncome.money)+'／維持費 −'+fmt(f.lastIncome.upkeep)+'）</span>':'')+'</dd><dt>兵糧</dt><dd>'+fmt(f.food)+' 石</dd><dt>兵</dt><dd>動員可 '+fmt(pw.available)+'・出陣 '+fmt(pw.field)+'・守備 '+fmt(pw.garrison)+'</dd><dt>陣営総兵力</dt><dd>'+fmt(U.campPower(S,fid))+'（御家人を含む）</dd><dt>正当性</dt><dd>'+Math.round(f.legitimacy)+'</dd><dt>朝廷</dt><dd>関係 '+Math.round(f.courtRelation)+'・影響力 '+Math.round(U.courtInfluence(S,fid))+'</dd></dl></div>';
+  h+=goalCard();
+  h+=regimeCard(f,fid);
+  var rets=E.retainersOf(S,fid);
+  if(rets.length) h+='<div class="card"><div class="small">家臣の家・御家人への命令と一覧は「御家人」タブ、恩賞（論功行賞・御恩・没官領）は「恩賞」タブへ。</div><div class="row"><button class="btn sm" data-goto="vassals">御家人タブへ</button><button class="btn sm" data-goto="rewards">恩賞タブへ</button></div></div>';
+  var myBases=Object.keys(S.bases).filter(function(k){return S.bases[k].owner===fid&&S.bases[k].type!=='寺社';});
+  h+='<div class="card"><h3>★ 本拠点</h3><div class="small">いま：<b>'+esc(f.capital?S.bases[f.capital].name:'なし（流浪）')+'</b>。本拠点は地図で「★本拠」と金の二重の輪で表示（敵の本拠は「敵本拠」）。総大将が出陣しないときは本拠点に残って采配する。</div><div class="row"><select id="capSel">'+myBases.map(function(k){ var b=S.bases[k]; return opt(k,b.name+'（'+S.provinces[b.province].name+'・'+b.type+'・防御'+b.maxDefense+'）'+(k===f.capital?'【現在】':''),k===f.capital); }).join('')+'</select><button class="btn" id="bCap">本拠点を移す</button></div><div class="small muted">移転の費用：100貫＋防御×5貫。攻められている拠点・寺社は不可。当主が出陣中でなければ移る。</div></div>';
+  if(['雌伏','密謀'].indexOf(f.status)>=0&&['yoritomo','kiso','kai'].indexOf(fid)>=0) h+='<div class="card"><h3>挙兵</h3><div class="small">'+(f.flags.ryoji?'令旨を受けており大義名分がある。':'<b>令旨をまだ受けていない</b>ため正当性は低い。')+'挙兵すると平家と交戦状態になる。</div><div class="row"><button class="btn red" data-act2="uprise">挙兵する</button></div></div>';
+  h+='<div class="card"><h3>徴兵</h3><div class="small">所領・拠点のある国で兵を召し抱え、武士団を増やす。</div><div class="row"><button class="btn" id="bRecOpen">👥 徴兵する</button></div></div>';
+  var pr=E.foodPrice(S);
+  h+='<div class="card"><h3>兵糧の購入</h3><div class="small">いまの相場：<b>'+pr+'</b>（平年＝1。収穫期の9〜11月は安く、端境期の4〜7月と飢饉の年は高い）'+(S.flags.famineUntil&&S.day<S.flags.famineUntil?' <span class="chip red">飢饉</span>':'')+'</div><div class="row"><input id="buyAmt" type="number" value="1000" style="width:90px"> 石 <button class="btn sub" id="bBuy">購入</button></div><div class="small muted">蔵の米は毎月1.5%ずつ傷む。軍への補給は補給線（味方の拠点から街道をたどる）が通じている国だけ。</div></div>';
+  h+='<div class="card"><h3>寺社への寄進</h3><div class="row"><select id="donB">'+Object.keys(S.bases).filter(function(k){return S.bases[k].type==='寺社';}).map(function(k){return opt(k,S.bases[k].name);}).join('')+'</select><input id="donA" type="number" value="500" style="width:80px">貫 <button class="btn sub" id="bDon">寄進</button></div></div>';
+  return h;
+};
+function spoilsCard(fid,sps,rets){ return '<div class="card" style="border-color:#c9a227"><h3>⚔ 没官領（処分を待つ）</h3><div class="small">戦で奪った所領。直轄領にすれば年貢は自家に入るが、奉公した家は恩賞を待っている。恩賞が遅れると忠誠が下がり、謀反のおそれが出る（血のつながった一門は背かない）。</div>'+sps.map(function(x){ var hd=S.holdings[x.holding]; return '<div class="row" style="margin:4px 0"><b>'+esc(hd.name)+'</b><span class="small muted">（'+esc(S.provinces[hd.province].name)+'・'+fmt(hd.output)+'石・'+esc(fnm(x.from).replace(/（.*）/,''))+'から）</span><select data-spto="'+x.holding+'">'+opt('direct','直轄領にする')+rets.map(function(r){ return opt(r.id,(r.kind==='house'?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,''))+'に与える（奉公'+Math.round(E.serviceOf(S,fid,r.id))+'・忠誠'+Math.round(E.retLoyalty(S,r,fid))+'）'); }).join('')+'</select><button class="btn sm" data-sp="'+x.holding+'">決める</button></div>'; }).join('')+'</div>'; }
+function showVcRes(r){ var el=document.getElementById('vcRes'); if(el&&r&&r.results) el.innerHTML=r.results.map(function(x){return '<div>'+(x.ok?'✓ ':'✗ ')+esc(x.text)+'</div>';}).join(''); }
+TABS.vassals=function(f,fid){
+  if(!f) return '<div class="card">観戦モードです。</div>';
+  var h='', rets=E.retainersOf(S,fid);
+  if(!rets.length) return '<div class="card"><h3>御家人</h3><div class="small">まだ従う家・御家人がいない。外交タブの使者で同盟・臣従を働きかけるか、大軍で近づいて帰順させる。</div></div>';
+  var tot=rets.reduce(function(t,r){return t+(r.kind==='house'?E.houseTroops(S,r.id):U.factionPower(S,r.id).available);},0);
+  var enemyB0=Object.keys(S.bases).filter(function(k){var b=S.bases[k]; return b.owner&&U.atWar(S,fid,b.owner);}).sort(function(a,b){var c=S.bases[f.capital]?S.bases[f.capital].province:null; return c?U.distProv(S,c,S.bases[a].province)-U.distProv(S,c,S.bases[b].province):0;}).slice(0,25);
+  var ownB0=Object.keys(S.bases).filter(function(k){return S.bases[k].owner&&U.topLord(S,S.bases[k].owner)===U.topLord(S,fid);});
+  var cps0=Object.keys(S.corps).filter(function(k){return S.corps[k].faction===fid;});
+  window._vAll={attack:enemyB0.map(function(k){return opt(k,S.bases[k].name+'（'+S.provinces[S.bases[k].province].name+'）');}).join(''),defend:ownB0.map(function(k){return opt(k,S.bases[k].name+'（'+S.provinces[S.bases[k].province].name+'）');}).join(''),join:cps0.map(function(k){return opt(k,pnm(S.corps[k].commander)+'の軍団');}).join('')};
+  h+='<div class="card" style="border-color:#1e7a45"><h3>📣 御家人全体への命令</h3><div class="small">従う家・御家人 <b>'+rets.length+'</b>家・兵 <b>'+fmt(tot)+'</b>。命令は各家が忠誠などをみて受ける（忠誠の厚い家ほど応じる）。</div>'+
+    '<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><button class="btn" data-vc="muster" title="各家が自分の銭・兵糧で本領の兵を増やす（30日に一度）">👥 兵を増やせ（軍役の備え）</button><button class="btn sub" data-vc="recall">🏠 帰陣せよ</button></div>'+
+    '<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><select id="vcAct"><option value="attack">⚔ 出陣せよ（敵の拠点を攻める）</option><option value="defend">🛡 守りにつけ（味方の拠点へ）</option>'+(cps0.length?'<option value="join">🚩 軍団に加われ</option>':'')+'</select><select id="vcTgt">'+(window._vAll.attack||'<option value="">（交戦中の敵の拠点がない）</option>')+'</select><button class="btn red" id="bVc">全家に命じる</button></div><div id="vcRes" class="small" style="margin-top:6px"></div></div>';
+  if(rets.length) h+='<div class="card"><h3>家臣の家・御家人</h3><div class="small muted">家（北条氏・比企氏など）は主君に仕えつつ、自分の郎党・所領・蔵を持つ。主君が直接動かせるのは直轄兵だけで、家の兵は出陣の「参陣催促」で集める。本領安堵・新恩給与（所領タブ）・役職で忠誠を保つ。没収は他の家を警戒させる。<b>奉公</b>＝参陣や勝ち戦の働きのうち、まだ報いていない分。多いまま放っておくと忠誠が下がり、忠誠25未満で野心の強い家は<b>謀反</b>しうる（一門は背かない、縁戚は背きにくい）。</div><table class="t"><tr><th>家</th><th class="num">忠誠</th><th class="num">奉公</th><th class="num">兵</th><th class="num">所領</th><th></th></tr>'+rets.map(function(r){ var isH=r.kind==='house', hh=isH?S.houses[r.id]:null, kin=E.kinship(S,fid,r), sv=Math.round(E.serviceOf(S,fid,r.id)), lo=Math.round(E.retLoyalty(S,r,fid));
+    return '<tr><td>'+esc(isH?hh.name:fnm(r.id).replace(/（.*）/,''))+'<div class="small muted">'+(isH?'家・当主 '+esc(pnm(hh.head))+'・蔵 '+fmt(hh.money||0)+'貫':'御家人（勢力）')+'</div>'+(kin==='blood'?'<span class="chip gold">一門</span>':kin==='inlaw'?'<span class="chip">縁戚</span>':'')+'</td><td class="num '+(lo<35?'ng':lo>=70?'ok':'')+'">'+lo+(lo<35&&kin!=='blood'?'⚠':'')+'</td><td class="num '+(sv>4?'ng':'')+'">'+sv+'</td><td class="num">'+fmt(isH?E.houseTroops(S,r.id):U.factionPower(S,r.id).available)+'</td><td class="num">'+(isH?E.houseHoldings(S,r.id).length:Object.keys(S.holdings).filter(function(k){return S.holdings[k].controller===r.id;}).length)+'</td><td><button class="btn sub sm" data-ando="'+r.id+'">本領安堵</button></td></tr>'; }).join('')+'</table></div>';
+  if(rets.length){ var enemyB=Object.keys(S.bases).filter(function(k){var b=S.bases[k]; return b.owner&&U.atWar(S,fid,b.owner);}).sort(function(a,b){return U.distProv(S,S.bases[f.capital]?S.bases[f.capital].province:S.bases[a].province,S.bases[a].province)-U.distProv(S,S.bases[f.capital]?S.bases[f.capital].province:S.bases[b].province,S.bases[b].province);}).slice(0,25);
+    var ownB=Object.keys(S.bases).filter(function(k){return S.bases[k].owner&&U.topLord(S,S.bases[k].owner)===U.topLord(S,fid);});
+    var cps=Object.keys(S.corps).filter(function(k){return S.corps[k].faction===fid;});
+    var tgtOpts={attack:enemyB.map(function(k){return opt(k,S.bases[k].name+'（'+S.provinces[S.bases[k].province].name+'・'+fnm(S.bases[k].owner).replace(/（.*）/,'')+'）');}).join(''),
+      defend:ownB.map(function(k){return opt(k,S.bases[k].name+'（'+S.provinces[S.bases[k].province].name+'）');}).join(''),
+      join:cps.map(function(k){return opt(k,pnm(S.corps[k].commander)+'の軍団 → '+(S.corps[k].target?(S.corps[k].target.type==='base'?S.bases[S.corps[k].target.id].name:S.provinces[S.corps[k].target.id].name):'?'));}).join('')};
+    window._vTgt=tgtOpts;
+    h+='<div class="card"><h3>📜 指図（御家人・家への要請）</h3><div class="small">家臣ではないので命令ではなく「頼み」。相手は忠誠・一門か縁戚か・大義・距離・自領の危険・恩賞の滞りで、承知／遅れて承知／断るを決める。承知した軍は頼んだ目標に向かい、果たすと奉公が加わる（恩賞で報いること）。同じ相手には20日あける。たびたび頼むと少し負担に思われる。</div>'+
+      '<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><select id="voWho">'+rets.map(function(r){var isH=r.kind==='house';return opt(r.id,(isH?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,''))+'（忠誠'+Math.round(E.retLoyalty(S,r,fid))+'）');}).join('')+'</select>'+
+      '<select id="voAct"><option value="attack">出陣を頼む（敵の拠点を攻める）</option><option value="defend">守りを頼む（味方の拠点へ）</option>'+(cps.length?'<option value="join">軍団に合流させる</option>':'')+'</select>'+
+      '<select id="voTgt">'+(tgtOpts.attack||'<option value="">（交戦中の敵の拠点がない）</option>')+'</select><button class="btn" id="bVo">頼む</button></div></div>'; }
+  var vas=Object.keys(S.factions).filter(function(k){return S.factions[k].alive&&S.factions[k].overlord===fid;});
+  if(vas.length) h+='<div class="card"><h3>御家人（主従関係の勢力・AIが自律行動）</h3>'+vas.map(function(k){var p=U.factionPower(S,k);return '<div>'+fsw(k)+esc(fnm(k))+' <span class="small muted">動員可'+fmt(p.available)+' 出陣'+fmt(p.field)+'</span></div>';}).join('')+'<div class="small muted">御家人は自分の判断で動くが、上の「指図」で出陣・守り・合流を頼める。御家人の武将も総大将・部隊の大将・軍奉行に任じられる。</div></div>';
+  return h;
+};
+TABS.rewards=function(f,fid){
+  if(!f) return '<div class="card">観戦モードです。</div>';
+  var h='', rets=E.retainersOf(S,fid), BS=E.BESTOW;
+  var owe=rets.map(function(r){return {r:r,svc:E.serviceOf(S,fid,r.id),L:E.retLoyalty(S,r,fid)};}).sort(function(a,b){return b.svc-a.svc;});
+  h+='<div class="card" style="border-color:#c9a227"><h3>🏅 論功行賞</h3><div class="small">「奉公」は報いていない働き。たまると参陣を渋り、やがて忠誠が下がる。働いた家から順に報いる。忠誠70以上の家は、本領が攻められていない限り出陣を断らない（遅れても来る）。</div>'+
+    (owe.length?'<table class="t" style="margin-top:4px"><tr><th>家・御家人</th><th class="num">忠誠</th><th class="num">奉公</th><th>報いる</th></tr>'+owe.map(function(o){ var r=o.r, isH=r.kind==='house', nm=isH?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,'');
+      return '<tr><td>'+esc(nm)+'</td><td class="num">'+Math.round(o.L)+'</td><td class="num"'+(o.svc>=3?' style="color:#8b1e1e;font-weight:700"':'')+'>'+Math.round(o.svc)+'</td><td><div class="row" style="gap:3px;flex-wrap:wrap">'+
+        Object.keys(BS).map(function(k){return '<button class="btn sub sm" data-bs="'+k+'" data-bt="'+r.id+'" title="'+esc(BS[k].note)+'">'+esc(BS[k].label.replace('を与える','').replace('を推挙する','推挙').replace('（馬・太刀）',''))+(BS[k].cost?' '+BS[k].cost:'')+'</button>';}).join('')+(isH?'<button class="btn sub sm" data-ando="'+r.id+'">本領安堵</button>':'')+'</div></td></tr>'; }).join('')+'</table>'+
+      '<div class="row" style="margin-top:6px"><button class="btn" id="bAllKanjo">働いた家すべてに感状と引出物（40貫ずつ）</button></div>':'<div class="small muted">従う家・御家人がいない</div>')+'</div>';
+  var sps=E.pendingSpoils(S,fid); if(sps.length) h+=spoilsCard(fid,sps,rets);
+  var direct=Object.keys(S.holdings).filter(function(k){var x=S.holdings[k];return x.controller===fid&&!x.house&&x.type!=='国衙領';});
+  if(direct.length&&rets.length) h+='<div class="card"><h3>🗺 新恩給与（直轄の所領を与える）</h3><div class="small">所領を与えると、その家の本領になって兵と年貢がその家に入る。もっとも重い恩賞。</div>'+direct.slice(0,30).map(function(k){var x=S.holdings[k];return '<div class="row small" style="margin:3px 0"><b>'+esc(x.name)+'</b><span class="muted">（'+esc(S.provinces[x.province].name)+'・'+fmt(x.output)+'石）</span><select data-gto="'+k+'">'+rets.map(function(r){return opt(r.id,(r.kind==='house'?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,'')));}).join('')+'</select><button class="btn sm" data-grant="'+k+'">与える</button></div>';}).join('')+'</div>';
+  { var myP=Object.keys(S.persons).filter(function(k){var p=S.persons[k];return p.alive&&p.faction===fid&&k!==f.leader&&!p.captiveOf;}), BS=E.BESTOW;
+    if(rets.length||myP.length) h+='<div class="card"><h3>🎁 御恩（所領のほかに与えられるもの）</h3><div class="small">働きに報いると忠誠が上がり、たまった奉公（報いていない働き）が減る。報いないままだと参陣に応じにくくなり、やがて離反の種になる。所領は「所領」タブ（新恩給与・本領安堵・没官領）、先陣は出陣の編成で任せる。</div>'+
+      '<table class="t" style="margin-top:4px">'+Object.keys(BS).map(function(k){var d=BS[k];return '<tr><td><b>'+esc(d.label)+'</b></td><td class="num">'+(d.cost?d.cost+'貫':'無料')+'</td><td class="small">'+esc(d.note)+'（忠誠+'+d.loy+'）</td></tr>';}).join('')+'</table>'+
+      '<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><select id="goWho">'+rets.map(function(r){var isH=r.kind==='house';return opt(r.id,(isH?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,''))+'（忠誠'+Math.round(E.retLoyalty(S,r,fid))+'・奉公'+Math.round(E.serviceOf(S,fid,r.id))+'）');}).join('')+(myP.length?'<optgroup label="家臣（人物）">'+myP.map(function(k){return opt(k,pnm(k)+'（忠誠'+Math.round(S.persons[k].loyalty==null?60:S.persons[k].loyalty)+'）');}).join('')+'</optgroup>':'')+'</select>'+
+      '<select id="goKind">'+Object.keys(BS).map(function(k){return opt(k,BS[k].label);}).join('')+'</select><button class="btn" id="bGo">与える</button></div></div>'; }
+  return h;
+};
+TABS.armies=function(f,fid){
+  if(!f) return '<div class="card muted">観戦モード</div>';
+  var my=Object.keys(S.armies).filter(function(k){return S.armies[k].faction===fid;});
+  var h='<div class="card"><div class="row"><button class="btn red" data-act2="muster">⚔ 出陣の編成</button><button class="btn" data-act2="recruit">👥 徴兵</button>'+(['雌伏','密謀'].indexOf(f.status)>=0&&['yoritomo','kiso','kai'].indexOf(fid)>=0?'<button class="btn red" data-act2="uprise">挙兵する</button>':'')+'</div><div class="small muted">地図の自軍をクリックして選び、行き先をクリックすると進軍します（勝算が表示されます）。</div></div>';
+  h+=my.map(function(k){ var a=S.armies[k], q=E.armyQuality(S,a);
+    return '<div class="card"><h3>'+esc(U.armyLabel(S,a))+' <span class="chip">'+statusJa(a.status)+'</span></h3><div class="small">'+esc(S.provinces[a.province].name)+(a.target?' → '+esc(a.target.type==='base'?S.bases[a.target.id].name:S.provinces[a.target.id].name):'')+'　士気'+Math.round(a.morale)+'　疲労'+Math.round(a.fatigue)+'　兵糧'+Math.floor(a.food/Math.max(1,a.troops*0.005))+'日分</div>'+
+      '<table class="t" style="margin-top:4px"><tr><th>役</th><th>武将</th><th class="num">兵</th></tr>'+a.divisions.map(function(d){return '<tr><td>'+(d.main?'総大将（本隊）':'部隊大将')+'</td><td>'+esc(pnm(d.leader))+'</td><td class="num">'+fmt(d.troops)+'</td></tr>';}).join('')+'<tr><td>軍奉行</td><td>'+esc(a.bugyo?pnm(a.bugyo):'なし')+'</td><td></td></tr></table>'+
+      '<div class="small muted">軍の質 '+Math.round(q.factor*100)+(q.notes.length?'：'+esc(q.notes.join('・')):'')+'</div>'+
+      '<div class="row"><button class="btn sm" data-move="'+k+'">進軍</button><button class="btn sub sm" data-org="'+k+'">編成</button><button class="btn sub sm" data-look="'+k+'">地図で見る</button><button class="btn sub sm" data-disband="'+k+'">解散</button>'+(S.armies[k].status!=='retreating'?'<button class="btn red sm" data-wd="'+k+'">退却</button>':'')+'</div></div>'; }).join('');
+  return h;
+};
+TABS.persons=function(f,fid){
+  var who=window._psF||fid; var h='<div class="card"><select id="psF">'+(fid?opt('',('自勢力')):'')+Object.keys(S.factions).map(function(k){return opt(k,S.factions[k].name,k===window._psF);}).join('')+'</select></div>';
+  var ps=Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return who?(p.faction===who||p.captiveOf===who):true;});
+  return h+ps.map(personCard).join('');
+};
+function holdingActs(x,fid,rets){
+  var o='', direct=x.controller===fid&&!x.house, mine=(x.house&&S.houses[x.house]&&S.houses[x.house].lord===fid)||(x.controller&&S.factions[x.controller]&&S.factions[x.controller].overlord===fid);
+  if(direct&&rets.length) o+='<div class="row small" style="margin:2px 0">新恩給与 <select data-gto="'+x.id+'">'+rets.map(function(r){return opt(r.id,r.kind==='house'?S.houses[r.id].name:fnm(r.id).replace(/（.*）/,''));}).join('')+'</select><button class="btn sub sm" data-grant="'+x.id+'">与える</button></div>';
+  if(mine) o+='<div class="row small" style="margin:2px 0"><button class="btn sub sm" data-conf="'+x.id+'">没収</button><span class="muted">（ほかの家も警戒する）</span></div>';
+  if(direct||mine) o+='<div class="row small" style="margin:2px 0">普請 <select data-fk="'+x.id+'">'+Object.keys(E.FACILITIES).map(function(k){var d=E.FACILITIES[k];return opt(k,d.label+'（'+d.money+'貫・'+d.days+'日）');}).join('')+'</select>'+(mine?'<select data-fp="'+x.id+'">'+opt('lord','主君が負担（依頼）',true)+opt('self','家の自費')+'</select>':'')+'<button class="btn sub sm" data-fac="'+x.id+'">建てる</button></div>';
+  return o;
+}
+TABS.holdings=function(f,fid){
+  var hid=fid||'heike', camp=U.topLord(S,hid);
+  var vas=Object.keys(S.factions).filter(function(k){return S.factions[k].alive&&S.factions[k].overlord===hid;});
+  var hs=Object.keys(S.holdings).map(function(k){return S.holdings[k];}).filter(function(x){ var r=x.rights||{}; return x.controller===hid||r.taxHolder===hid||r.honjo===hid||r.jito===hid||vas.indexOf(x.controller)>=0; });
+  var rets=f?E.retainersOf(S,fid):[];
+  var inc=E.distributeIncome(S).income[hid]||0, sh=E.SHARES, canJ=f&&f.flags.bakufu&&E.jitoAllowed(S);
+  var role=function(x){ var r=x.rights||{}, a=[]; if(r.honjo===hid) a.push('本所'); if(r.taxHolder===hid) a.push(x.type==='国衙領'?'知行国主':'預所・下司'); if(r.jito===hid) a.push('地頭'); if(x.controller===hid) a.push('実効支配'); return a.join('・'); };
+  var h='<div class="card"><h3>'+fsw(hid)+esc(fnm(hid))+'の所領と権利</h3><div class="small">年貢（生産の約3割）は権利ごとに分け合う：<br>国衙領＝朝廷1割・<b>知行国主</b>6割・在地の支配者3割／荘園＝<b>本所</b>3.5割・<b>預所・下司</b>4.5割・在地の武士2割／私領・郷＝在地の支配者がすべて。地頭は徴税の取り分から2割を得る。戦っている相手の取り分は、実効支配する側が<b>押領</b>する（本所の朝廷・寺社に恨まれる）。</div><div class="small" style="margin-top:4px">いまの年貢の取り分（年あたり・石）：<b>'+fmt(inc)+'</b>（秋の収穫期に多くが入る）</div>'+(f&&f.flags.bakufu&&!E.jitoAllowed(S)?'<div class="small muted">地頭の設置は文治元年（1185）11月の勅許から（史実）。</div>':'')+'</div>';
+  h+='<div class="card"><table class="t"><tr><th>所領</th><th>自家の権利</th><th class="num">石高</th><th></th></tr>'+hs.sort(function(a,b){return b.output-a.output;}).map(function(x){ var r=x.rights||{};
+    return '<tr><td>'+esc(x.name)+(x.oryo?' <span class="chip red">押領</span>':'')+'<div class="small muted">'+esc(S.provinces[x.province].name)+'・'+esc(x.type)+'・本所 '+esc(r.honjo?fnm(r.honjo).replace(/（.*）/,''):'—')+'（'+esc(x.proprietor||'')+'）／徴税 '+esc(r.taxHolder?fnm(r.taxHolder).replace(/（.*）/,''):'—')+(r.jito?'／地頭 '+esc(fnm(r.jito).replace(/（.*）/,'')):'')+'／実効 '+esc(x.controller?fnm(x.controller).replace(/（.*）/,''):'—')+'</div><div class="small"><span class="chip">'+esc(E.landCategory(S,x))+'</span>'+(x.house?' '+esc(S.houses[x.house].name)+'の本領':'')+(x.facilities&&x.facilities.length?' 施設：'+x.facilities.map(function(y){return esc(E.FACILITIES[y.kind].label)+(y.done?'':'（'+Math.round(y.progress/y.days*100)+'%）');}).join('・'):'')+'</div>'+(f?holdingActs(x,fid,rets):'')+'</td><td class="small">'+esc(role(x))+'</td><td class="num">'+fmt(x.output)+'</td><td>'+(canJ&&x.controller&&U.topLord(S,x.controller)===camp&&!r.jito&&(sh[x.type]||{}).tax>0?'<button class="btn sub sm" data-jito="'+x.id+'">地頭を置く</button>':'')+'</td></tr>'; }).join('')+'</table></div>';
+  if(f){ var sps=E.pendingSpoils(S,fid);
+    if(sps.length) h=spoilsCard(fid,sps,rets)+h;
+    var kp=Object.keys(S.provinces).filter(function(pid){ return U.topLord(S,S.provinces[pid].kokuga.holder||'')!==camp; });
+    h+='<div class="card"><h3>知行国（国司の任命）を申請</h3><div class="small muted">国衙領の年貢の6割を取る権利。朝廷の派閥の支持と、その国を実際に押さえているかで決まる。朝廷と戦う家は取り上げられる。</div><div class="row"><select id="kkP">'+kp.map(function(pid){ var i=U.provinceInfluence(S,pid)[0]; return opt(pid,S.provinces[pid].name+'（いま：'+fnm(S.provinces[pid].kokuga.holder).replace(/（.*）/,'')+(i&&U.topLord(S,i.faction)===camp?'・自陣営が支配':'')+'）'); }).join('')+'</select><button class="btn" id="bKk">申請</button></div></div>'; }
+  return h;
+};
+TABS.diplomacy=function(f,fid){
+  var h='';
+  if(f){ h+='<div class="card"><h3>使者の派遣</h3><div class="row">使者 <select id="envP">'+Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return p.alive&&p.faction===fid&&!p.captiveOf;}).map(function(p){return opt(p.id,p.name+'（外'+p.abilities.diplomacy+'）');}).join('')+'</select></div><div class="row">相手 <select id="envT">'+Object.keys(S.factions).filter(function(k){return k!==fid&&S.factions[k].alive&&k!=='court';}).map(function(k){return opt(k,S.factions[k].name);}).join('')+'</select></div><div class="row">内容 <select id="envK">'+opt('vassal_request','味方に誘う（主従を結ぶ）')+opt('alliance','同盟')+opt('peace','和睦')+opt('submit','臣従を申し入れる')+opt('break','同盟破棄')+'</select><button class="btn" id="bEnv">派遣</button></div></div>';
+    h+='<div class="card"><h3>宣戦</h3><div class="row"><select id="warT">'+Object.keys(S.factions).filter(function(k){return k!==fid&&S.factions[k].alive&&k!=='court'&&!U.atWar(S,fid,k);}).map(function(k){return opt(k,S.factions[k].name);}).join('')+'</select><button class="btn red" id="bWar">宣戦</button></div></div>'; }
+  var base=fid||'heike';
+  h+='<div class="card"><h3>関係</h3><table class="t">'+Object.keys(S.factions).filter(function(k){return S.factions[k].alive&&k!==base;}).map(function(k){ var r=U.rel(S,base,k); return '<tr><td>'+fsw(k)+esc(S.factions[k].name)+'</td><td>'+(U.atWar(S,base,k)?'<span class="chip red">交戦</span>':'<span class="chip">'+esc(r.status)+'</span>')+'</td><td class="num">'+Math.round(r.value)+'</td></tr>'; }).join('')+'</table></div>';
+  return h;
+};
+TABS.court=function(f,fid){
+  var c=S.court, pn=function(id){return id&&P(id)?esc(P(id).name)+(P(id).alive?'':'（故）'):'<span class="muted">空席／未設定</span>';};
+  var h='<div class="card"><h3>朝廷</h3><dl class="kv"><dt>所在</dt><dd>'+esc(S.bases[c.location].name)+'</dd><dt>天皇</dt><dd>'+pn(c.emperor)+(c.gaiseki?' <span class="small muted">外戚：'+esc(fnm(c.gaiseki).replace(/（.*）/,''))+'</span>':'')+'</dd>'+(c.rivalEmperor&&P(c.rivalEmperor.person)&&P(c.rivalEmperor.person).alive?'<dt>都を離れた帝</dt><dd>'+pn(c.rivalEmperor.person)+(c.rivalEmperor.with?'（'+esc(fnm(c.rivalEmperor.with))+'のもと）':'')+'</dd>':'')+'<dt>院政</dt><dd>'+pn(c.cloisteredEmperor)+'</dd><dt>法皇</dt><dd>'+pn(c.dharmaEmperor)+(c.dharmaEmperorConfined?' <span class="chip red">幽閉中（院宣は出ない）</span>':'')+'</dd><dt>'+esc(c.regentTitle)+'</dt><dd>'+pn(c.regent)+'</dd><dt>左大臣</dt><dd>'+pn(c.ministers.sadaijin)+'</dd><dt>右大臣</dt><dd>'+pn(c.ministers.udaijin)+'</dd><dt>朝廷を主導</dt><dd>'+fsw(c.controller)+esc(fnm(c.controller))+'</dd></dl></div>';
+  var cl=c.cliques||{}, tot=Object.keys(cl).reduce(function(t,k){return t+cl[k].influence;},0)||1;
+  h+='<div class="card"><h3>朝廷の派閥</h3><div class="small muted">影響力の大きい派閥ほど、任官・追討・院宣の審議を左右する。態度は史実上の傾き＋いまの状況（都の支配・正当性・朝敵）＋献金の恩で決まり、毎月少しずつ動く。</div>';
+  Object.keys(cl).forEach(function(k){ var x=cl[k], a=fid?Math.round(E.cliqueAtt(S,x,fid)):null, ac=a==null?'':(a>=30?'ok':a<=-30?'ng':'');
+    h+='<div style="border-top:1px solid var(--line);padding:6px 0;margin-top:6px"><div class="row" style="margin:0"><b>'+esc(x.name)+'</b><span class="chip">'+esc(x.confidence)+'</span></div>'+
+      '<div class="hbar"><span>影響力</span><div class="bar"><i style="width:'+Math.round(x.influence/tot*100)+'%;background:#7a5c2e"></i></div><b class="num">'+Math.round(x.influence/tot*100)+'%</b></div>'+
+      '<div class="small">頭目：'+(x.leader?pn(x.leader):'<span class="muted">（合議）</span>')+'　関心：'+esc(x.interest)+'</div>'+
+      (fid?'<div class="small">自家への態度：<b class="'+ac+'">'+(a>0?'+':'')+a+'</b>'+(fid!=='heike'?'　<span class="muted">（平家へ '+Math.round(E.cliqueAtt(S,x,'heike'))+'）</span>':'')+'</div>':'')+
+      (f?'<div class="row" style="margin:3px 0 0"><input type="number" data-gamt="'+k+'" value="300" step="100" style="width:80px">貫 <button class="btn sub sm" data-gift="'+k+'">献金・儀式の支援</button></div>':'')+'</div>'; });
+  h+='<div class="small muted" style="margin-top:4px">同じ派閥への献金は2か月に一度まで。法皇を幽閉している家の院方への献金は響きにくい。</div></div>';
+  if(f){ var sup=Math.round(E.courtSupport(S,fid)*100), ins=E.insenAvailable(S);
+    h+='<div class="card"><h3>朝廷工作</h3><div class="small">朝廷での支持（派閥の影響力×態度）：<b>'+(sup>0?'+':'')+sup+'</b></div>'+
+      '<div class="row">院宣を求める <select id="inT"><option value="">（正当性のみ）</option>'+Object.keys(S.factions).filter(function(k){return k!==fid&&S.factions[k].alive&&k!=='court'&&U.atWar(S,fid,k);}).map(function(k){return opt(k,S.factions[k].name+'の追討');}).join('')+'</select><button class="btn" id="bIn" '+(ins?'':'disabled')+'>院へ使いを出す</button></div><div class="small muted">'+(ins?'院宣は法皇が出す。朝廷を握る家と対立していても得られる（院方の態度しだい）。得れば正当性 +8。':'いまは院宣が出ない（'+(c.dharmaEmperorConfined?'法皇は幽閉中':'先の院宣から日が浅い')+'）。')+'</div>'+
+      '<div class="row">追討宣旨を申請 <select id="tsT">'+Object.keys(S.factions).filter(function(k){return k!==fid&&S.factions[k].alive&&k!=='court';}).map(function(k){return opt(k,S.factions[k].name);}).join('')+'</select><button class="btn" id="bTs">申請</button></div><div class="small muted">宣旨は朝廷として出す。都を握る家と派閥の態度で決まる。</div>'+
+      '<div class="row">任官 <select id="apP">'+Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return p.alive&&p.faction===fid;}).map(function(p){return opt(p.id,p.name);}).join('')+'</select><select id="apO">'+S.offices.filter(function(o){return o.category!=='武家役職';}).map(function(o){return opt(o.id,o.name);}).join('')+'</select></div><div class="row">献金 <input id="apG" type="number" value="0" style="width:80px">貫 <button class="btn" id="bAp">申請</button></div><div class="small muted">除目は摂関の派閥と院の意向が大きい。影響力が強くても、摂関家や法皇と不仲なら望む官職は得にくい。</div></div>'; }
+  h+='<div class="card"><h3>宣旨・院宣</h3>'+(c.edicts.length?c.edicts.slice().reverse().map(function(e){return '<div class="small">'+esc(e.date)+'：<b>'+esc(e.type)+'</b>（'+esc(fnm(e.target))+(e.requester&&e.requester!==e.target?'／'+esc(fnm(e.requester))+'へ':'')+'）</div>';}).join(''):'<div class="muted">なし</div>')+'</div>';
+  var cl2=S.aiLog.filter(function(l){return l.faction==='court';}).slice(-8).reverse();
+  if(cl2.length) h+='<div class="card"><h3>朝廷の動き</h3>'+cl2.map(function(l){return '<div class="small" style="margin-bottom:4px"><span class="muted">'+esc(l.date.replace(/（.*）/,''))+'</span> '+esc(l.speech||l.action)+'<div class="muted">'+esc(l.reason)+'</div></div>';}).join('')+'</div>';
+  return h;
+};
+function bakufuChartCard(){
+  var c=E.bakufuChart(S); if(!c) return '';
+  var W=330, mid=W/2, y=18, o='', esc2=function(t){return esc(t||'—');};
+  var box=function(x,y,role,name,hl){ return '<text x="'+x+'" y="'+y+'" text-anchor="middle" font-size="11" fill="#6b5a3e">'+esc(role)+'</text><text x="'+x+'" y="'+(y+15)+'" text-anchor="middle" font-size="13" font-weight="700" fill="'+(hl?'#8b1e1e':'#1f1a14')+'">'+esc2(name)+'</text>'; };
+  o+=box(mid,y,'将軍',pnm(c.shogun)); var yy=y+22;
+  if(c.shikken){ o+='<line x1="'+mid+'" y1="'+yy+'" x2="'+mid+'" y2="'+(yy+14)+'" stroke="#1f5c7a" stroke-width="1.5"/>'; o+=box(mid,yy+26,'執権',pnm(c.shikken.person)+'（'+E.pName(S,c.shikken.holder)+'）',c.shikken.holder===S.playerFaction); yy+=48; }
+  var by=yy+14, cols=[[55,'問注所執事',c.offices.monchujo],[mid,c.offices.mandokoroName,c.offices.mandokoro],[W-55,'侍所別当',c.offices.samurai]];
+  o+='<line x1="'+mid+'" y1="'+yy+'" x2="'+mid+'" y2="'+by+'" stroke="#1f5c7a" stroke-width="1.5"/><line x1="55" y1="'+by+'" x2="'+(W-55)+'" y2="'+by+'" stroke="#1f5c7a" stroke-width="1.5"/>';
+  cols.forEach(function(k){ o+='<line x1="'+k[0]+'" y1="'+by+'" x2="'+k[0]+'" y2="'+(by+10)+'" stroke="#1f5c7a" stroke-width="1.5"/>'+box(k[0],by+22,k[1],k[2]?pnm(k[2]):'空席'); });
+  var ty=by+66, rows=[['御一門',c.ichimon.map(function(x){return x.name;})],['宿老',c.shukuro.map(function(x){return x.name+(x.loyalty<35?'⚠':'');})],['御家人',c.gokenin.map(function(x){return x.name+(x.loyalty<35?'⚠':'');})]];
+  rows.forEach(function(r){ var names=r[1].length?r[1]:['—'], lines=[], cur='';
+    names.forEach(function(n){ if((cur+'・'+n).length>17&&cur){ lines.push(cur); cur=n; } else cur=cur?cur+'・'+n:n; }); if(cur) lines.push(cur);
+    o+='<text x="8" y="'+ty+'" font-size="12" font-weight="700" fill="#1f1a14">'+r[0]+'</text>'; lines.forEach(function(l,i){ o+='<text x="62" y="'+(ty+i*15)+'" font-size="11.5" fill="#1f1a14">'+esc(l)+'</text>'; }); ty+=Math.max(1,lines.length)*15+12; });
+  return '<div class="card"><h3>🏛 幕府の相関図</h3><svg viewBox="0 0 '+W+' '+(ty)+'" width="100%" style="max-width:'+W+'px">'+o+'</svg><div class="small muted">執権は置かれてから表示。宿老＝幕府内の影響力が大きい上位3家。⚠＝忠誠が低く謀反のおそれ。一門（主君と血のつながった家）は背かない。</div></div>';
+}
+function shogunateCard(f,fid){
+  var ps=E.participants(S); if(!ps.length) return '';
+  var sg=S.shogunate||{inf:{},log:[],reforms:{}}, me=ps.some(function(p){return p.id===fid;}), sh=S.factions.yoritomo, sk=sg.shikken;
+  var h='<div class="card"><h3>⚖ 幕府の御家人政治</h3><div class="small">将軍家：'+fsw('yoritomo')+esc(pnm(sh.leader))+'（CPU）　執権：'+(sk?'<b>'+esc(pnm(sk.person))+'</b>（'+esc(E.pName(S,sk.holder))+'・'+esc(sk.date)+'から）':'<span class="muted">なし</span>')+(sg.rensho?'　連署：'+esc(pnm(sg.rensho.person)):'')+'</div>';
+  if(S.player&&S.player.history&&S.player.history.length) h+='<div class="small muted">操作の移行：'+S.player.history.map(function(x){return esc(x.date)+' '+esc(fnm(x.from))+'→'+esc(fnm(x.to))+'（'+esc(x.reason)+'）';}).join('、')+'</div>';
+  h+='<table class="t" style="margin-top:4px"><tr><th>御家人</th><th class="num">影響力</th><th class="num">兵</th><th class="num">将軍家</th>'+(me?'<th class="num">自家と</th>':'')+'</tr>'+ps.slice().sort(function(a,b){return (sg.inf[b.id]||0)-(sg.inf[a.id]||0);}).map(function(p){ var t=me&&p.id!==fid?Math.round(E.tie(S,fid,p.id)):null;
+    return '<tr'+(p.id===fid?' style="background:#fbf3dc"':'')+'><td>'+esc(E.pName(S,p.id))+(sg.wary&&sg.wary[p.id]>15?' <span class="chip red">警戒される</span>':'')+(sg.impeached&&sg.impeached[p.id]!=null?' <span class="chip">失脚</span>':'')+'</td><td class="num">'+Math.round(sg.inf[p.id]||0)+'</td><td class="num">'+fmt(p.kind==='house'?E.houseTroops(S,p.id):U.factionPower(S,p.id).available+U.factionPower(S,p.id).garrison)+'</td><td class="num">'+Math.round(E.shogunTie(S,p.id))+'</td>'+(me?'<td class="num '+(t==null?'':t>=20?'ok':t<=-20?'ng':'')+'">'+(t==null?'—':(t>0?'+':'')+t)+'</td>':'')+'</tr>'; }).join('')+'</table><div class="small muted">影響力＝幕府の役職・兵・所領・将軍家との関係・将軍家との縁戚。強引な手（訴え・孤立・私戦）を重ねると「警戒される」。</div>';
+  if(me){ var tg=ps.filter(function(p){return p.id!==fid;}), ins=sh.institutions||{};
+    h+='<div style="margin-top:6px"><b>権力闘争</b></div><div class="row"><select id="bkAct">'+[['ally','同盟する（200貫）'],['marriage','婚姻で取り込む（300貫）'],['seek','役職を求める（300貫）'],['isolate','孤立させる（300貫）'],['exploit','御家人同士の対立を利用する（250貫）'],['impeach','将軍家に訴えて排除する（500貫）'],['attack','討伐する']].map(function(x){return opt(x[0],x[1]);}).join('')+'</select><select id="bkTgt">'+tg.map(function(p){return opt(p.id,E.pName(S,p.id));}).join('')+'</select><select id="bkOff">'+Object.keys(ins).map(function(k){return opt(k,E.INSTITUTIONS[k].name+'の'+E.INSTITUTIONS[k].head+'（いま：'+(ins[k].head?pnm(ins[k].head):'空席')+'）');}).join('')+'</select><button class="btn" id="bBk">実行</button></div><div class="small muted">役職を求める＝右の機関の長を望む。訴え＝ほかの御家人の同心が多いほど通りやすい（失敗すると将軍家の不興）。討伐＝訴えで失脚した相手か、執権の名でのみ大義が立つ（それ以外は私戦）。</div>';
+    var st=E.shikkenStatus(S,fid);
+    if(!sk||sk.holder!==fid){ h+='<div style="margin-top:6px"><b>執権への道</b></div>'+st.rows.map(function(r){return '<div class="small">'+(r.ok?'<span class="ok">✔</span>':'□')+' '+esc(r.label)+'</div>';}).join('')+'<button class="btn" id="bShikken" '+(st.ok&&!sk?'':'disabled')+'>執権に就く</button>'+(sk?'<div class="small ng">いまは'+esc(E.pName(S,sk.holder))+'が執権。訴えて退ければ道が開ける。</div>':''); }
+    else { var sup=Math.round(E.reformSupport(S,fid));
+      h+='<div style="margin-top:6px"><b>執権としての幕府運営</b>（御家人の支持 '+sup+'）</div>'+Object.keys(E.REFORMS).map(function(k){ var d=E.REFORMS[k], x=sg.reforms[k]; return '<div class="row" style="margin:2px 0"><button class="btn sub sm" data-rf="'+k+'" '+(x||sup<d.support?'disabled':'')+'>'+esc(d.label)+'（'+d.money+'貫・'+d.days+'日・支持'+d.support+'）</button><span class="small muted">'+(x?(x.done?'済み':'進行中'):esc(d.desc))+'</span></div>'; }).join(''); }
+    if(sk&&sk.holder===fid){ var cand=Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return p.alive&&!p.captiveOf&&(p.faction==='yoritomo'||ps.some(function(q){return q.id===p.faction;})||Object.keys(S.houses).some(function(k){return S.houses[k].members.indexOf(p.id)>=0&&S.houses[k].lord==='yoritomo';}));}).slice(0,60);
+      h+='<div class="row" style="margin-top:6px">人事 <select id="apOf">'+Object.keys(ins).map(function(k){return opt(k,E.INSTITUTIONS[k].name+'の'+E.INSTITUTIONS[k].head);}).join('')+opt('shugo','守護')+'</select><select id="apPs">'+cand.map(function(p){return opt(p.id,p.name);}).join('')+'</select><button class="btn sub sm" id="bApOf">任じる</button></div>'; } }
+  if(sg.log&&sg.log.length) h+='<div style="margin-top:6px"><b>幕府の動き</b></div>'+sg.log.slice(-8).reverse().map(function(l){return '<div class="small"><span class="muted">'+esc(l.date.replace(/（.*）/,''))+'</span> '+esc(l.text)+'</div>';}).join('');
+  return h+'</div>';
+}
+function politicsCard(fid){
+  var st=E.politicalStatus(S,fid); if(!st) return '';
+  var P=S.politics||{cabals:[],records:{falls:[]}}, n=function(v){return v==null?'—':v;}, bar=function(v){ var pc=Math.max(0,Math.min(100,(v+100)/2)); return '<span style="display:inline-block;width:56px;height:7px;background:#eee5d0;vertical-align:middle;margin-left:3px"><span style="display:block;height:7px;width:'+pc+'%;background:'+(v<0?'#8b1e1e':'#1f5c7a')+'"></span></span>'; };
+  var h='<div class="card"><h3>🧭 政治情勢（自家）</h3><div class="small">操作人物：<b>'+esc(pnm(st.person))+'</b>（'+esc(S.player.status||'在任')+'）　家督：'+esc(pnm(st.head))+(st.head!==st.person?' <span class="chip">操作人物とは別</span>':'')+'</div>';
+  h+='<table class="t" style="margin-top:4px"><tr><td>御家人からの支持</td><td class="num">'+n(st.gokenin)+(st.gokenin!=null?bar(st.gokenin):'')+'</td><td>北条一門からの支持</td><td class="num">'+n(st.ichimon)+(st.ichimon!=null?bar(st.ichimon):'')+'</td></tr>'+
+     '<tr><td>将軍家との関係</td><td class="num">'+st.shogun+bar(st.shogun)+'</td><td>朝廷との関係</td><td class="num">'+n(st.court)+'</td></tr>'+
+     '<tr><td>幕府内の影響力</td><td class="num">'+st.influence+'（'+st.share+'%）</td><td>政治的正統性</td><td class="num">'+st.legitimacy+'</td></tr>'+
+     '<tr><td>自家の兵</td><td class="num">'+fmt(st.military)+'</td><td>自家の蔵</td><td class="num">'+fmt(st.money)+'貫</td></tr>'+
+     '<tr><td>諜報</td><td class="num">'+st.intel+'</td><td>警固</td><td class="num">'+st.guard+'</td></tr></table>';
+  h+='<div class="small" style="margin-top:4px">謀反・暗殺の危険：<b'+(/高い/.test(st.danger)?' style="color:#8b1e1e"':'')+'>'+esc(st.danger)+'</b></div>';
+  if(st.complaints.length) h+='<div class="small">不満を抱く家：'+st.complaints.slice(0,5).map(function(c){return esc(E.pName(S,c.id))+'（'+c.v+(c.why?'・'+esc(c.why):'')+'）';}).join('、')+'</div>';
+  var cabs=P.cabals.filter(function(c){return c.target===fid;});
+  if(cabs.length){ h+='<div style="margin-top:6px"><b>反対派の動き</b></div>'+cabs.map(function(c){ var v=E.cabalView(S,c); return '<div class="small" style="border-left:3px solid #8b1e1e;padding-left:6px;margin:3px 0">'+esc(v.text)+(v.stage?'　段階'+v.stage+'/4':'')+(v.members?'<br>構成：'+esc(v.members.join('・')):'')+(v.hostility!=null?'　敵意'+v.hostility+'・結束'+v.cohesion+'・力'+v.power:'')+'<div class="row" style="margin-top:3px"><button class="btn sub sm" data-pol="compromise" data-cb="'+c.id+'">妥協する</button><button class="btn sub sm" data-pol="divide" data-cb="'+c.id+'">切り崩す（300貫）</button><button class="btn sub sm" data-pol="strike" data-cb="'+c.id+'" '+(v.leader?'':'disabled title="首謀者が分からない"')+'>首謀者を除く（200貫）</button></div></div>'; }).join(''); }
+  h+='<div style="margin-top:6px"><b>対抗手段</b></div><div class="row"><button class="btn sub sm" data-pol="consult">合議する（100貫）</button><button class="btn sub sm" data-pol="spy">諜報（150貫）</button><button class="btn sub sm" data-pol="guard">警固を厚く（200貫）</button><button class="btn sub sm" data-pol="retire">隠居して後を託す</button></div>';
+  h+='<div class="small muted">所領安堵・新恩給与（所領タブ）、婚姻・同盟（下の権力闘争）、役職の任命も支持を左右する。一門への役職の集中や強引な没収・弾圧は反発を招く。反対派の中身は諜報が足りないと噂しか分からない。</div>';
+  var ph=(S.player.personHistory||[]).slice(-6).reverse(), fl=(P.records.falls||[]).slice(-6).reverse();
+  if(ph.length) h+='<div style="margin-top:6px"><b class="small">操作人物の交代</b></div>'+ph.map(function(x){return '<div class="small"><span class="muted">'+esc(x.date.replace(/（.*）/,''))+'</span> '+esc(pnm(x.from))+(x.to!==x.from?'→'+esc(pnm(x.to)):'')+'（'+esc(x.reason)+'）</div>';}).join('');
+  if(fl.length) h+='<div style="margin-top:6px"><b class="small">失脚・追放・暗殺などの記録</b></div>'+fl.map(function(x){ var k={resign:'役職を解かれる',tonsure:'出家',exile:'追放',confine:'幽閉',headchange:'家督を退く',assassinated:'暗殺',executed:'殺害',plot_foiled:'暗殺未遂（露見）',retire:'隠居'}[x.kind]||x.kind; return '<div class="small"><span class="muted">'+esc(x.date.replace(/（.*）/,''))+'</span> '+esc(pnm(x.person))+'：'+k+(x.by?'（'+esc(E.pName(S,x.by))+'）':'')+'</div>';}).join('');
+  return h+'</div>';
+}
+function shogunCard(){
+  var st=E.shogunState(S); if(!st) return '';
+  var sg=S.shogunate||{}, bar=function(v,lo,hi){ var pc=Math.max(0,Math.min(100,(v-lo)/(hi-lo)*100)); return '<span style="display:inline-block;width:70px;height:7px;background:#eee5d0;vertical-align:middle;margin-left:4px"><span style="display:block;height:7px;width:'+pc+'%;background:'+(pc<35?'#8b1e1e':'#1f5c7a')+'"></span></span>'; };
+  var h='<div class="card"><h3>👑 将軍：'+esc(pnm(st.person))+(st.sick?' <span class="chip red">病</span>':'')+'</h3>';
+  h+='<div class="small">器量（政治）'+st.ability+'　権威 '+st.authority+bar(st.authority,0,100)+'　御家人の支持 '+st.support+bar(st.support,-100,100)+'　支える兵 '+fmt(st.military)+'</div>';
+  h+='<div class="small">後ろ盾（乳母・妻の実家・外戚）：'+(st.backers.length?st.backers.map(function(b){return esc(E.pName(S,b));}).join('・'):'<span class="muted">なし</span>')+'</div>';
+  h+='<div class="small">後継・擁立の候補：'+(st.candidates.length?st.candidates.map(function(c){return esc(pnm(c));}).join('・'):'<span class="muted">なし</span>')+'</div>';
+  if(st.crisis) h+='<div class="small" style="margin-top:4px;color:#8b1e1e"><b>進退をめぐる争いの最中</b>：'+esc(E.pName(S,st.crisis.leader))+'が'+esc(pnm(st.crisis.candidate))+'を擁立しようとしている（'+esc(st.crisis.why.replace(/・$/,''))+'）</div>';
+  if(st.history.length) h+='<div style="margin-top:4px"><b class="small">将軍交代の記録</b></div>'+st.history.slice(-5).reverse().map(function(x){ var k={depose:'廃位',limit:'権限の制限',keep:'維持',war:'内乱'}[x.kind]; return '<div class="small"><span class="muted">'+esc(x.date.replace(/（.*）/,''))+'</span> '+k+'：'+esc(pnm(x.from))+(x.to!==x.from?'→'+esc(pnm(x.to)):'')+'（主導：'+esc(E.pName(S,x.by))+'）</div>'; }).join('');
+  h+='<div class="small muted" style="margin-top:4px">将軍は病・支持の喪失・権威の低下・候補の存在などの条件がそろうと、交代の争いが起きる。結果（維持・制限・廃位・内乱）は双方の力で決まり、史実のとおりとは限らない。</div>';
+  return h+'</div>';
+}
+function clanCard(){
+  var c=E.clanStatus(S); if(!c) return '';
+  var h='<div class="card"><h3>🪷 北条一門</h3><div class="small">'+esc(c.title)+'：<b>'+esc(pnm(c.head))+'</b>　得宗家の成熟度 '+c.level+'/100'+(c.level<30?' <span class="muted">（まだ得宗家は成立していない）</span>':'')+'</div>';
+  h+='<div class="small">執権：'+(c.shikken?esc(pnm(c.shikken.person))+'（'+esc(E.pName(S,c.shikken.holder))+'）'+(c.shikken.person!==c.head?' <span class="chip">得宗とは別の人</span>':''):'<span class="muted">なし</span>')+'</div>';
+  h+='<div style="margin-top:4px"><b class="small">分家</b></div>'+(c.branches.length?'<table class="t"><tr><th>家</th><th>当主</th><th class="num">影響力</th><th class="num">家督と</th></tr>'+c.branches.map(function(b){return '<tr><td>'+esc(b.name)+'</td><td>'+esc(pnm(b.head))+'</td><td class="num">'+b.inf+'</td><td class="num">'+b.tie+'</td></tr>';}).join('')+'</table>':'<div class="small muted">まだない（名越・極楽寺・政村・金沢の各流は、祖となる人物が生まれ成人すると立つ）</div>');
+  h+='<div style="margin-top:4px"><b class="small">御内人（得宗家の家臣。御家人とは別）</b></div>'+(c.miuchi.length?c.miuchi.map(function(m){return '<div class="small">'+esc(m.name)+'　影響力'+m.influence+'・忠誠'+m.loyalty+'・兵'+m.troops+'</div>';}).join(''):'<div class="small muted">まだいない（得宗家が育つと現れる）</div>');
+  return h+'</div>';
+}
+TABS.bakufu=function(f,fid){
+  if(!f) return '<div class="card muted">観戦モード</div>';
+  var shg=bakufuChartCard()+(E.participants(S).length?politicsCard(fid)+shogunCard():'')+shogunateCard(f,fid)+(E.participants(S).length?clanCard():''); if(fid!=='yoritomo'&&shg) return shg;
+  var I=E.INSTITUTIONS, h=shg||'', inst=f.institutions||{};
+  if(!f.flags.bakufu){ var c=E.bakufuCheck(S,fid);
+    h+='<div class="card"><h3>武家政権（幕府）を開く</h3><div class="small">本拠を定め、御家人を束ねる体制を作ると、侍所・公文所（のち政所）・問注所を置けるようになる。</div><div style="margin-top:6px">'+(c.ok?'<span class="ok">条件を満たしている</span>':c.why.map(function(w){return '<div class="small ng">・'+esc(w)+'</div>';}).join(''))+'</div><div class="row"><button class="btn red" id="bBaku"'+(c.ok?'':' disabled')+'>武家政権を開く</button></div><div class="small muted">幕府の成立時期には1180年（侍所設置）・1183年（東国支配の公認）・1185年（守護地頭）・1192年（征夷大将軍）など諸説がある。</div></div>'; }
+  else h+='<div class="card"><h3>'+esc(f.name)+'の武家政権</h3><div class="small">本拠：'+esc(f.capital?S.bases[f.capital].name:'—')+'</div></div>';
+  var people=Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return p.alive&&!p.captiveOf&&U.topLord(S,p.faction)===fid&&p.id!==f.leader;});
+  Object.keys(I).forEach(function(k){ var d=I[k], cur=inst[k], replaced=k==='kumonjo'&&inst.mandokoro;
+    h+='<div class="card"><h3>'+esc(d.name)+' <span class="small muted">（'+esc(d.head)+'）</span>'+(cur?' <span class="chip green">設置済</span>':replaced?' <span class="chip">政所に改組</span>':'')+'</h3><div class="small">'+esc(d.effect)+'</div><div class="small muted">史実：'+esc(d.hist)+'</div>'+
+      (cur?'<div class="small">'+esc(d.head)+'：<b>'+esc(pnm(cur.head))+'</b>（'+esc((cur.date||'').replace(/（.*）/,''))+'）</div>':
+       (!replaced&&f.flags.bakufu?'<div class="row">'+esc(d.head)+' <select data-ihead="'+k+'"><option value="">自動で選ぶ</option>'+people.map(function(p){return opt(p.id,p.name+'（政'+p.abilities.politics+'・統'+p.abilities.command+'）');}).join('')+'</select><button class="btn sm" data-inst="'+k+'">設置（'+d.money+'貫）</button></div>'+(S.options.mode==='historical'&&S.date.y<d.est?'<div class="small ng">史実モードでは'+d.est+'年以降</div>':''):''))+'</div>'; });
+  return h;
+};
+TABS.build=function(f,fid){
+  if(!f) return '<div class="card muted">観戦モード</div>';
+  var BU=E.BUILD, h='<div class="card"><h3>新しい館・城を建てる</h3><div class="row">規模 <select id="bdS">'+Object.keys(BU).map(function(k){var b=BU[k];return opt(k,b.label+'（'+b.money+'貫・兵糧'+b.food+'石・約'+b.days+'日）');}).join('')+'</select></div><div class="row">名前 <input id="bdN" placeholder="空欄なら自動" style="flex:1"></div><div class="row"><button class="btn red" id="bBuild">地図で建設地を選ぶ</button></div><div class="small muted">自勢力の所領・拠点がある国（影響力25%以上）に建てられる。地図上で建てられる国は案内が出る。雪国の冬・収穫期・荒廃で遅れ、敵軍が入ると中断し、12日で放棄。</div></div>';
+  var cs=Object.keys(S.constructions).map(function(k){return S.constructions[k];}).filter(function(c){return c.faction===fid;});
+  h+='<div class="card"><h3>普請中（'+cs.length+'）</h3>'+(cs.length?cs.map(function(c){var pc=Math.min(100,c.progress/c.required*100);return '<div style="padding:5px 0;border-top:1px solid #eee5d0"><b>'+esc(c.name)+'</b> <span class="chip">'+esc(c.spec.label)+'</span>'+(c.paused?' <span class="chip red">中断</span>':'')+'<div class="prog"><i style="width:'+pc+'%"></i></div><div class="row"><button class="btn sub sm" data-goto="'+c.x+','+c.y+'">地図で見る</button><button class="btn sub sm" data-cancelb="'+c.id+'">取りやめ</button></div></div>';}).join(''):'<div class="muted">なし</div>')+'</div>';
+  return h;
+};
+TABS.select=function(){
+  if(!sel) return '<div class="card muted">地図上の国・拠点・軍勢をクリックすると詳細を表示します。</div>';
+  var h='';
+  if(sel.type==='province'){ var p=S.provinces[sel.id], inf=U.provinceInfluence(S,sel.id);
+    h+='<div class="card"><h3>'+esc(p.name)+'国 <span class="small muted">'+esc(p.circuit)+'</span></h3><dl class="kv"><dt>地形</dt><dd>'+esc(p.terrain)+(p.snowyWinter?'（冬は雪）':'')+'</dd><dt>生産</dt><dd>'+fmt(p.output)+' 石／年 <span class="chip">推定</span></dd><dt>国衙</dt><dd>'+esc(fnm(p.kokuga.holder))+' <span class="chip">'+esc(p.kokuga.confidence)+'</span></dd></dl><div class="bar">'+inf.map(function(x){return '<span style="width:'+(x.share*100)+'%;background:'+fcol(x.faction)+'"></span>';}).join('')+'</div>'+inf.map(function(x){return '<div class="small">'+fsw(x.faction)+esc(fnm(x.faction))+' '+Math.round(x.share*100)+'%</div>';}).join('')+'</div>';
+    h+='<div class="card"><h3>所領</h3><table class="t">'+Object.keys(S.holdings).map(function(k){return S.holdings[k];}).filter(function(x){return x.province===sel.id;}).map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+fsw(x.controller)+esc(fnm(x.controller))+'</td><td class="num">'+fmt(x.output)+'</td></tr>';}).join('')+'</table></div>';
+    h+='<div class="card"><h3>街道</h3>'+(S.adj[sel.id]||[]).map(function(rid){var r=S.roads[rid], o=r.a===sel.id?r.b:r.a;return '<div class="small">'+esc(S.provinces[o].name)+'：'+esc(r.name||'道')+'（'+r.km+'km'+(r.stations&&r.stations.length?'・'+esc(r.stations.join('・')):'')+'）</div>';}).join('')+'</div>';
+  } else if(sel.type==='base'){ var b=S.bases[sel.id];
+    h+='<div class="card"><h3>'+esc(b.name)+'</h3><dl class="kv"><dt>国</dt><dd>'+esc(S.provinces[b.province].name)+'</dd><dt>種別</dt><dd>'+esc(b.type)+'</dd><dt>所有</dt><dd>'+fsw(b.owner)+esc(fnm(b.owner))+'</dd><dt>防御</dt><dd>'+Math.round(b.defense)+'／'+b.maxDefense+'</dd><dt>守備兵</dt><dd>'+fmt(b.garrison)+'</dd></dl><div class="small muted">'+esc(b.note)+'</div></div>';
+  } else if(sel.type==='army'){ var a=S.armies[sel.id]; if(!a) return '<div class="card muted">この軍勢はもうない</div>';
+    var q=E.armyQuality(S,a);
+    h+='<div class="card"><h3>'+esc(U.armyLabel(S,a))+'</h3><div class="small">'+fsw(a.faction)+esc(fnm(a.faction))+'　'+statusJa(a.status)+'</div><table class="t" style="margin-top:4px">'+a.divisions.map(function(d){return '<tr><td>'+(d.main?'総大将':'部隊大将')+'</td><td>'+esc(pnm(d.leader))+'</td><td class="num">'+fmt(d.troops)+'</td></tr>';}).join('')+'<tr><td>軍奉行</td><td>'+esc(a.bugyo?pnm(a.bugyo):'なし')+'</td><td></td></tr></table><div class="small muted">軍の質 '+Math.round(q.factor*100)+(q.notes.length?'：'+esc(q.notes.join('・')):'')+'</div><div class="small">経路：'+esc([a.province].concat(a.path).map(function(p){return S.provinces[p].name;}).join('→'))+'</div></div>';
+  }
+  return h;
+};
+function personCard(p){
+  var a=p.abilities, loc=p.location?(p.location.indexOf('army:')===0?(S.armies[p.location.slice(5)]?U.armyLabel(S,S.armies[p.location.slice(5)]):'軍中'):p.location.indexOf('envoy:')===0?'使者として外出中':(S.bases[p.location]?S.bases[p.location].name:p.location)):'—';
+  return '<div class="card"><h3>'+esc(p.name)+(p.alive?'':' <span class="chip red">故</span>')+(p.captiveOf?' <span class="chip red">捕縛</span>':'')+'</h3><div class="small">'+(p.born||'生年不詳')+'〜'+(p.died?p.died+'（史実）':'')+' <span class="chip">'+esc(p.birthConfidence)+'</span>　'+esc(p.status)+'</div>'+((p.courtOffices||[]).length||(p.warriorOffices||[]).length?'<div class="small">'+esc((p.courtOffices||[]).concat(p.warriorOffices||[]).join('・'))+'</div>':'')+'<div class="small">統率'+a.command+' 武勇'+a.valor+' 政治'+a.politics+' 知略'+a.intellect+' 外交'+a.diplomacy+'　'+esc(p.personality)+'</div><div class="small muted">所在：'+esc(loc)+'</div></div>';
+}
+function bindLeft(){
+  var q=function(id){return document.getElementById(id);};
+  if(q('bRecOpen')) q('bRecOpen').onclick=function(){ openRecruit(null); };
+  if(q('bCap')) q('bCap').onclick=function(){ run({type:'set_capital',base:q('capSel').value}); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-pol]'),function(b){ b.onclick=function(){ run({type:'politics',act:b.getAttribute('data-pol'),cabal:b.getAttribute('data-cb')||null}); }; });
+  if(q('voAct')) q('voAct').onchange=function(){ var v=q('voAct').value; q('voTgt').innerHTML=(window._vTgt||{})[v]||'<option value="">（選べる先がない）</option>'; };
+  [].forEach.call(document.querySelectorAll('[data-goto]'),function(b){ b.onclick=function(){ ltab=b.dataset.goto; renderLeft(); }; });
+  [].forEach.call(document.querySelectorAll('[data-vc]'),function(b){ b.onclick=function(){ var r=run({type:'vassal_command',act:b.dataset.vc}); showVcRes(r); }; });
+  if(q('vcAct')) q('vcAct').onchange=function(){ q('vcTgt').innerHTML=(window._vAll||{})[q('vcAct').value]||'<option value="">（選べる先がない）</option>'; };
+  if(q('bVc')) q('bVc').onclick=function(){ var act=q('vcAct').value, t=q('vcTgt').value; if(!t){ toast('✗ 先を選ぶこと',false); return; } var r=run(act==='join'?{type:'vassal_command',act:act,corps:t}:{type:'vassal_command',act:act,target:t}); showVcRes(r); };
+  [].forEach.call(document.querySelectorAll('[data-bs]'),function(b){ b.onclick=function(){ run({type:'bestow',target:b.dataset.bt,kind:b.dataset.bs}); }; });
+  if(q('bAllKanjo')) q('bAllKanjo').onclick=function(){ var rets=E.retainersOf(S,S.playerFaction).filter(function(r){return E.serviceOf(S,S.playerFaction,r.id)>=1;}); if(!rets.length){ toast('✗ 働き（奉公）のある家がない',false); return; } var n=0; rets.forEach(function(r){ var a=E.issueCommand(S,{type:'bestow',faction:S.playerFaction,target:r.id,kind:'kanjo'}); E.issueCommand(S,{type:'bestow',faction:S.playerFaction,target:r.id,kind:'gift'}); if(a.ok) n++; }); toast('✓ '+n+'家に感状と引出物を与えた',true); render(); };
+  if(q('bGo')) q('bGo').onclick=function(){ run({type:'bestow',target:q('goWho').value,kind:q('goKind').value}); };
+  if(q('bVo')) q('bVo').onclick=function(){ var act=q('voAct').value, t=q('voTgt').value; if(!t){ toast('✗ 頼む先を選ぶこと',false); return; } run(act==='join'?{type:'vassal_order',vassal:q('voWho').value,act:act,corps:t}:{type:'vassal_order',vassal:q('voWho').value,act:act,target:t}); };
+  if(q('bBk')) q('bBk').onclick=function(){ run({type:'bakufu',act:q('bkAct').value,target:q('bkTgt').value,office:q('bkOff')?q('bkOff').value:null}); };
+  if(q('bShikken')) q('bShikken').onclick=function(){ run({type:'bakufu',act:'shikken'}); };
+  if(q('bApOf')) q('bApOf').onclick=function(){ run({type:'appoint_office',office:q('apOf').value,person:q('apPs').value}); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-rf]'),function(b){ b.onclick=function(){ run({type:'reform',kind:b.getAttribute('data-rf')}); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ando]'),function(b){ b.onclick=function(){ run({type:'ando',target:b.getAttribute('data-ando')}); }; });
+  if(q('bHeir')) q('bHeir').onclick=function(){ if(q('heirSel').value) run({type:'set_heir',person:q('heirSel').value}); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-rg]'),function(b){ b.onclick=function(){ run({type:'regime',action:b.getAttribute('data-rg')}); }; });
+  if(q('bBuy')) q('bBuy').onclick=function(){ run({type:'buy_food',amount:+q('buyAmt').value}); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-sp]'),function(b){ b.onclick=function(){ var id=b.getAttribute('data-sp'); run({type:'spoil',holding:id,to:document.querySelector('[data-spto="'+id+'"]').value}); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-grant]'),function(b){ b.onclick=function(){ var id=b.getAttribute('data-grant'); run({type:'grant',holding:id,target:document.querySelector('[data-gto="'+id+'"]').value}); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-conf]'),function(b){ b.onclick=function(){ run({type:'confiscate',holding:b.getAttribute('data-conf')}); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-fac]'),function(b){ b.onclick=function(){ var id=b.getAttribute('data-fac'), p=document.querySelector('[data-fp="'+id+'"]'); run({type:'build_facility',holding:id,kind:document.querySelector('[data-fk="'+id+'"]').value,payer:p?p.value:'lord'}); }; });
+  if(q('bKk')) q('bKk').onclick=function(){ run({type:'petition',kind:'kokushi',province:q('kkP').value}); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-jito]'),function(b){ b.onclick=function(){ run({type:'jito',holding:b.getAttribute('data-jito')}); }; });
+  if(q('bDon')) q('bDon').onclick=function(){ run({type:'donate',base:q('donB').value,amount:+q('donA').value}); };
+  if(q('bEnv')) q('bEnv').onclick=function(){ run({type:'envoy',person:q('envP').value,to:q('envT').value,proposal:q('envK').value}); };
+  if(q('bWar')) q('bWar').onclick=function(){ if(q('warT').value) run({type:'declare_war',to:q('warT').value}); };
+  if(q('bTs')) q('bTs').onclick=function(){ run({type:'petition',kind:'tsuito',target:q('tsT').value}); };
+  if(q('bIn')) q('bIn').onclick=function(){ run({type:'petition',kind:'insen',target:q('inT').value||null}); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-gift]'),function(b){ b.onclick=function(){ var k=b.getAttribute('data-gift'); run({type:'court_gift',clique:k,amount:+document.querySelector('[data-gamt="'+k+'"]').value}); }; });
+  if(q('bAp')) q('bAp').onclick=function(){ run({type:'petition',kind:'appointment',person:q('apP').value,office:q('apO').value,gift:+q('apG').value}); };
+  if(q('bBaku')) q('bBaku').onclick=function(){ run({type:'found_bakufu'}); };
+  if(q('psF')) q('psF').onchange=function(){ window._psF=q('psF').value; renderLeft(); };
+  if(q('hfSel')) q('hfSel').onchange=function(){ window._hf=q('hfSel').value; renderLeft(); };
+  if(q('bBuild')) q('bBuild').onclick=function(){ command={kind:'build',scale:q('bdS').value,name:q('bdN').value}; svg.classList.add('targeting'); hint('建設地をクリック（右クリック／Escで取消）'); if(window.innerWidth<820) $('left').classList.add('closed'); };
+  [].forEach.call(document.querySelectorAll('[data-inst]'),function(b){ b.onclick=function(){ var hd=document.querySelector('[data-ihead="'+b.dataset.inst+'"]'); run({type:'establish',inst:b.dataset.inst,head:hd&&hd.value||null}); }; });
+  [].forEach.call(document.querySelectorAll('[data-act2]'),function(b){ b.onclick=function(){ if(b.dataset.act2==='uprise') run({type:'uprising'}); else if(b.dataset.act2==='recruit') openRecruit(null); else openSortie({}); }; });
+  [].forEach.call(document.querySelectorAll('[data-move]'),function(b){ b.onclick=function(){ sel={type:'army',id:b.dataset.move}; beginMove(b.dataset.move); lookAt(S.armies[b.dataset.move]); render(); }; });
+  [].forEach.call(document.querySelectorAll('[data-org]'),function(b){ b.onclick=function(){ openOrg({army:b.dataset.org}); }; });
+  [].forEach.call(document.querySelectorAll('[data-look]'),function(b){ b.onclick=function(){ sel={type:'army',id:b.dataset.look}; lookAt(S.armies[b.dataset.look]); render(); }; });
+  [].forEach.call(document.querySelectorAll('[data-disband]'),function(b){ b.onclick=function(){ run({type:'disband',army:b.dataset.disband}); }; });
+  [].forEach.call(document.querySelectorAll('[data-wd]'),function(b){ b.onclick=function(){ var k=b.dataset.wd; if(S.armies[k]&&S.armies[k].battleId&&!confirm('交戦中の退却は追撃を受けて兵を失います。退却させますか？')) return; run({type:'withdraw',army:k}); }; });
+  [].forEach.call(document.querySelectorAll('[data-cancelb]'),function(b){ b.onclick=function(){ run({type:'cancel_build',id:b.dataset.cancelb}); }; });
+  [].forEach.call(document.querySelectorAll('[data-goto]'),function(b){ b.onclick=function(){ var v=b.dataset.goto.split(','); centerOn(+v[0],+v[1],140); }; });
+}
+function centerOn(x,y,w){ var r=svg.getBoundingClientRect(), asp=r.height/Math.max(1,r.width); view={x:x-w/2,y:y-w*asp/2,w:w,h:w*asp}; applyView(); scheduleRedraw(); }
+function lookAt(a){ if(!a) return; var p=armyPos(a); centerOn(p.x,p.y,Math.min(view.w,420)); }
+
+// ================================================================ 右パネル（ニュース）・ティッカー
+$('newsBtn').onclick=function(){ $('right').classList.toggle('open'); seenLog=S?S.log.length:0; renderRight(); ticker(); };
+[].forEach.call(document.querySelectorAll('#rtabs button'),function(b){ b.onclick=function(){ if(b.dataset.t==='close'){ $('right').classList.remove('open'); return; } rtab=b.dataset.t; renderRight(); }; });
+function renderRight(){
+  if(!S) return; setTabs('rtabs',rtab); var h='', fid=S.playerFaction;
+  if(rtab==='news'||rtab==='mine'){ var L=S.log.slice(-300).reverse(); if(rtab==='mine') L=L.filter(function(l){return l.factions.indexOf(fid)>=0;}); h=L.map(function(l){return '<div class="card" style="padding:5px 8px;margin-bottom:5px'+(l.type==='battle'?';border-left:3px solid #8b1e1e':'')+'"><span class="small muted">'+esc(l.date.replace(/（.*）/,''))+'</span><div'+(l.important?' style="font-weight:700"':'')+'>'+esc(l.text)+'</div></div>';}).join(''); }
+  else if(rtab==='battles') h=S.battleHistory.slice().reverse().map(function(b){return '<div class="card"><b>'+esc(b.name)+'</b> <span class="small muted">'+esc(b.date.replace(/（.*）/,''))+'</span><div class="small">勝：'+esc(fnm(b.winner))+'　敗：'+esc(fnm(b.loser))+'　'+b.days+'日　兵 '+fmt(b.start.att)+' 対 '+fmt(b.start.def)+'　損害 '+b.losses.att+'／'+b.losses.def+(b.dead.length?'　討死：'+esc(b.dead.join('、')):'')+'</div></div>';}).join('')||'<div class="muted">まだ合戦はない</div>';
+  else if(rtab==='ai') h=S.aiLog.slice(-200).reverse().map(function(l){return '<div class="card" style="padding:5px 8px;margin-bottom:5px"><span class="small muted">'+esc(l.date.replace(/（.*）/,''))+'</span> '+fsw(l.faction)+'<b>'+esc(fnm(l.faction))+'</b>：'+esc(l.action)+(l.speech?'<div class="small" style="margin-top:2px">「'+esc(l.speech)+'」</div>':'')+'<div class="small muted">理由：'+esc(l.reason)+'</div></div>';}).join('')||'<div class="muted">なし</div>';
+  else if(rtab==='cmds') h=S.commandHistory.slice().reverse().map(function(c){return '<div class="small '+(c.ok?'':'ng')+'" style="padding:3px 0;border-bottom:1px dotted #e3d9c0">'+esc(c.date.replace(/（.*）/,''))+'　'+esc(c.label)+(c.ok?'':'（'+esc(c.reason)+'）')+(c.delayed?'（伝達'+c.delayed+'日）':'')+'</div>';}).join('')||'<div class="muted">なし</div>';
+  else if(rtab==='check'){ var v=E.validate(S); h='<div class="card"><b>年代矛盾：'+v.errors.length+'件</b>'+v.errors.map(function(e){return '<div class="small ng">'+esc(e)+'</div>';}).join('')+'</div><div class="card"><b>推定・未確認：'+v.uncertain.length+'件</b>'+v.uncertain.map(function(u){return '<div class="small"><span class="chip">'+esc(u.kind)+'</span><span class="chip gold">'+esc(u.confidence)+'</span>'+esc(u.item)+'　<span class="muted">'+esc(u.note)+'</span></div>';}).join('')+'</div>'; }
+  $('rbody').innerHTML=h;
+}
+var tickIdx=-1, tickItems=[];
+function ticker(){
+  if(!S) return;
+  if(tickIdx<0||tickIdx>S.log.length) tickIdx=S.log.length;
+  var now=Date.now(), changed=false;
+  for(var i=tickIdx;i<S.log.length;i++){ var l=S.log[i]; if(l.important&&l.type!=='system'){ tickItems.push({key:i,html:'<span class="small muted">'+esc(l.date.replace(/（.*）/,''))+'</span> '+esc(l.text),t:now}); changed=true; } }
+  tickIdx=S.log.length;
+  if(tickItems.length>4){ tickItems=tickItems.slice(-4); changed=true; }
+  var box=$('ticker');
+  if(changed){
+    var keep={}; tickItems.forEach(function(it){ keep[it.key]=1; });
+    [].slice.call(box.children).forEach(function(el){ if(!keep[el.dataset.k]) box.removeChild(el); });
+    tickItems.forEach(function(it){ if(!box.querySelector('[data-k="'+it.key+'"]')){ var d=document.createElement('div'); d.className='new'; d.dataset.k=it.key; d.innerHTML=it.html; box.appendChild(d); } });
+  }
+  var unread=$('right').classList.contains('open')?0:S.log.slice(seenLog).filter(function(l){return l.important;}).length;
+  $('newsBadge').style.display=unread?'':'none'; $('newsBadge').textContent=unread>99?'99+':unread;
+}
+setInterval(function(){ var now=Date.now(), box=$('ticker'); tickItems=tickItems.filter(function(it){ var el=box.querySelector('[data-k="'+it.key+'"]'); if(now-it.t>9000){ if(el){ el.classList.add('old'); setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); },700); } return false; } return true; }); },1000);
+
+// ================================================================ セーブ
+$('saveBtn').onclick=function(){ setSpeed(0); $('saveText').value=''; $('copyMsg').textContent=''; $('savemodal').classList.add('on'); };
+[].forEach.call(document.querySelectorAll('[data-close]'),function(b){ b.onclick=function(){ b.closest('.modal').classList.remove('on'); }; });
+$('copySave').onclick=function(){ if(!S) return; var t=E.save(S); $('saveText').value=t; try{ navigator.clipboard.writeText(t).then(function(){ $('copyMsg').textContent='コピーしました（'+Math.round(t.length/1024)+'KB）'; },function(){ $('saveText').select(); $('copyMsg').textContent='欄を選択してコピーしてください'; }); }catch(e){ $('saveText').select(); } };
+function doLoad(txt){ try{ S=E.load(txt); $('savemodal').classList.remove('on'); $('start').classList.remove('on'); seenLog=S.log.length; terrSig=''; home(); render(); toast('✓ 読み込んだ（'+U.dateStr(S)+'）',true); }catch(e){ $('copyMsg').textContent='読み込み失敗：'+e.message; } }
+$('doLoad').onclick=function(){ doLoad($('saveText').value); };
+$('loadLocal').onclick=function(){ try{ var t=localStorage.getItem('genpei_autosave'); if(t) doLoad(t); else $('copyMsg').textContent='自動セーブがありません'; }catch(e){ $('copyMsg').textContent='ブラウザ保存が使えません'; } };
+window.addEventListener('resize',function(){ if(S) scheduleRedraw(); });
+if(window.innerWidth<820){ $('left').classList.add('closed'); }
+})();
+</script>
+</body>
+</html>

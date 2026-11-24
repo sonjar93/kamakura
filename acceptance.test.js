@@ -597,4 +597,30 @@ ok('55. 討死はまれ：2年の戦乱で討死する人物はごく少ない',
     dead += s.log.filter(l => /討死|陥落時に討たれる/.test(l.text) && /【死去】/.test(l.text)).length; battles += s.log.filter(l => /【合戦】/.test(l.text)).length; }
   assert(battles > 10, '合戦はある ' + battles); assert(dead <= Math.max(2, battles * 0.03), '討死 ' + dead + '／合戦 ' + battles);
 });
+
+ok('56. 忠誠の厚い家（70以上）は、本領が攻められていない限り出陣を断らない（報いない働きの重みにも上限）', () => {
+  let refuse = 0, total = 0;
+  for (let seed = 1; seed <= 12; seed++) { const s = izuStart(seed); ['hojo', 'hiki', 'doi'].forEach(k => { s.houses[k].loyalty = 75; }); s.service = s.service || {};
+    ['hojo', 'hiki', 'doi'].forEach(k => E.addService ? E.addService(s, 'yoritomo', k, 6) : 0);
+    const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu');
+    const r = E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true });
+    (s.corps[r.corps].contingents || []).filter(c => ['hojo', 'hiki', 'doi'].includes(c.id)).forEach(c => { total++; if (c.decision === 'refuse') refuse++; }); }
+  assert(total >= 30 && refuse === 0, '不参 ' + refuse + '／' + total);
+});
+ok('57. 御家人全体への命令：兵を増やせ（各家が自分の銭で本領の兵を集め、家の兵に加わる）・出陣・帰陣', () => {
+  const s = izuStart(3); s.houses.hojo.money = 600; s.houses.hojo.food = 3000; const before = E.houseTroops(s, 'hojo');
+  const r = E.issueCommand(s, { type: 'vassal_command', faction: 'yoritomo', act: 'muster' }); assert(r.ok, r.reason); assert(r.results.some(x => x.id === 'hojo' && x.ok));
+  assert(!E.issueCommand(s, { type: 'vassal_command', faction: 'yoritomo', act: 'muster' }).ok, '30日に一度');
+  for (let d = 0; d < 40; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); }
+  assert(E.houseTroops(s, 'hojo') > before + 50, '北条氏の兵が増えた ' + before + '→' + E.houseTroops(s, 'hojo'));
+  const t = izuStart(4); const iz = E.sortieSources(t, 'yoritomo').find(x => x.province === 'izu');
+  t.bands[Object.keys(t.bands).find(k => t.bands[k].faction === 'yoritomo' && t.bands[k].province === 'izu' && !t.bands[k].house)].strength += 0;
+  const yb = Object.values(t.bands).filter(b => b.faction === 'yoritomo' && !b.house).reduce((a, b) => a + b.strength, 0);
+  E.issueCommand(t, { type: 'recruit', faction: 'yoritomo', province: 'izu', amount: 50 }); for (let d = 0; d < 30; d++) { t.pendingStops.forEach(e => e.resolved = true); E.advanceDay(t); }
+  assert.strictEqual(Object.values(t.bands).filter(b => b.house === 'hojo').reduce((a, b) => a + b.strength, 0) >= 65 - 1, true, '頼朝の徴兵が北条氏の兵に紛れない');
+  E.issueCommand(t, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, call: false });
+  const a = E.issueCommand(t, { type: 'vassal_command', faction: 'yoritomo', act: 'attack', target: 'yamaki' }); assert(a.ok && a.results.length >= 3, '全家に出陣を命じる');
+  const rc = E.issueCommand(t, { type: 'vassal_command', faction: 'yoritomo', act: 'recall' }); assert(rc.ok || /出ている/.test(rc.reason));
+});
+ok('58. 比企氏は本領の比企郡に館を持つ', () => { const s = izuStart(1); assert(s.bases.hiki_kan && s.bases.hiki_kan.province === 'musashi' && s.houses.hiki.seat === 'hiki_kan'); assert.strictEqual(s.holdings.hiki_go.house, 'hiki'); });
 console.log(`\n${n} 件の受入条件をすべて満たした`);
