@@ -17,7 +17,7 @@
   else root.GenpeiEngine = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var ENGINE_VERSION = '0.19.0';
+  var ENGINE_VERSION = '0.20.0';
 
   // ================================================================ 乱数（シード固定・状態に保存）
   function rand(s) {
@@ -180,7 +180,7 @@
     scn.relations.forEach(function (r) { var x = rel(s, r.a, r.b); x.value = r.value; x.status = r.status; x.war = false; });
     if (s.playerFaction && (!s.factions[s.playerFaction] || !s.factions[s.playerFaction].playable)) throw new Error('選択できない勢力です: ' + s.playerFaction);
     if (s.playerFaction && factionBases(s, s.playerFaction).length) s.flags.playerHadBase = true;
-    ensureCourt(s); ensureHoldings(s); ensureRegime(s); migrateHouses(s); migrateHouses3(s); migrateHouses4(s); ensurePlayer(s); ensurePolitics(s);
+    ensureCourt(s); ensureHoldings(s); ensureRegime(s); migrateHouses(s); migrateHouses3(s); migrateHouses4(s); ensurePlayer(s); ensurePolitics(s); ensureNinkan(s);
     news(s, scn.meta.title + ' 開始（' + (s.options.mode === 'historical' ? '史実モード：主要な出来事は史実の日付に起こる' : '自由モード：史実は強制されない') + '）。' + (s.playerFaction ? 'プレイヤー勢力：' + fname(s, s.playerFaction) : '観戦モード'), { important: true, type: 'system' });
     var v = validate(s); if (v.errors.length) news(s, '年代検証で ' + v.errors.length + ' 件の矛盾を検出', { type: 'system' });
     return s;
@@ -232,6 +232,7 @@
     if (p.faction !== fid && topLord(s, p.faction) !== topLord(s, fid)) return false;   // 自勢力か御家人（主従下の勢力）
     var loc = String(p.location || '');
     if (/^envoy:/.test(loc)) return false;
+    if (p.zaikyo) return false; // 検非違使など在京の官は京を離れられない
     if (/^army:/.test(loc) && loc !== 'army:' + armyId) return false;
     return true;
   }
@@ -369,7 +370,7 @@
     siegeSupply(s);            // 籠城の兵糧・開城
     detectBattles(s);          // 遭遇判定
     resolveBattles(s);         // 戦闘・包囲
-    if (s.date.d === 1) { monthly(s); courtPolitics(s); regimeTick(s); shogunateTick(s); if (shogunId(s)) shogunTick(s); houseDrift(s); clanTick(s); politicsMonthly(s); arrivalsTick(s); loyaltyTick(s); Object.keys(s.factions).forEach(function (k) { if (k !== s.playerFaction && s.factions[k].alive) aiSpoils(s, k); }); }
+    if (s.date.d === 1) { monthly(s); courtPolitics(s); regimeTick(s); shogunateTick(s); if (shogunId(s)) shogunTick(s); houseDrift(s); clanTick(s); politicsMonthly(s); arrivalsTick(s); ninkanMonthly(s); loyaltyTick(s); Object.keys(s.factions).forEach(function (k) { if (k !== s.playerFaction && s.factions[k].alive) aiSpoils(s, k); }); }
     birthsTick(s); reformsTick(s); // 経済（月次集計）・朝廷の派閥政治
     progressConstruction(s);   // 普請（築城）
     mortality(s);              // 人物の死亡判定
@@ -379,7 +380,7 @@
     checkEvents(s);            // 歴史イベント
     cleanup(s);
     syncSeatHoldings(s); facilitiesTick(s); contingentsTick(s); lordOrderTick(s);
-    politicsDaily(s);
+    politicsDaily(s); ninkanTick(s);
     checkVictory(s);           // 天下統一と5年の維持
     var newStops = s.pendingStops.slice(before);
     return { stops: newStops, blocked: false };
@@ -2290,6 +2291,125 @@
       if (sg.shikken && sg.shikken.holder === T.id && (sg.authority || 50) < 20) ps.forEach(function (q) { if (q.id !== T.id && shogunTie(s, q.id) > 40) addGrudge(s, q.id, T.id, 2, '将軍の権威を軽んじている'); }); });
     cabalTick(s);
   }
+  // ================================================================ 任官（官位・官職）：国司（受領・遙任）・検非違使・衛府の尉。幕府の役職（warriorOffices）とは別に持つ
+  // 任命権は朝廷。頼朝（幕府を開いた将軍）は御家人の任官を推挙し、無断の任官を統制する。時代とともに幕府の関与が強まる
+  var KAN = {
+    kami: { name: '国守', weight: 3, rank: '従五位下', cost: 200, note: '国の長官。受領として赴任すれば国衙の収入の一部が入り、その国で兵を集めやすい。遙任なら目代に任せ、収入は少ない' },
+    kebiishi: { name: '検非違使', title: '左衛門少尉・検非違使', weight: 2, rank: null, cost: 120, kyo: true, note: '京の治安を担う。在京が条件：任じられると京へ移り、在任中は京を離れて出陣できない（辞すれば戻れる）。朝廷・院との結びつきが強まる' },
+    jo: { name: '衛府の尉', weight: 1, rank: null, cost: 80, note: '左右衛門尉・兵衛尉。御家人の名誉の官途' }
+  };
+  var JO_T = ['左衛門尉', '右衛門尉', '左兵衛尉', '右兵衛尉'];
+  function ninkanEra(s) { var y = s.date.y, bk = shogunId(s) && (F(s, shogunId(s)).flags || {}).bakufu;
+    if (!bk) return { id: 'pre', name: '幕府成立前', note: '任官は朝廷と公家の派閥しだい。推挙できるのは自家の人物だけ（幕府を開くと御家人の推挙ができる）', bonus: 0, strict: 0 };
+    if (y >= 1221) return { id: 'jokyu', name: '承久の乱以後', note: '幕府が朝廷の人事にも強く介入する（推挙が通りやすい）', bonus: 0.3, strict: 2 };
+    if (y >= 1214) return { id: 'sanetomo', name: '実朝期（1214年以後）', note: '御家人の任官は幕府の許可を要するとの方針が再確認された（無断任官の咎めが重い）', bonus: 0.15, strict: 2 };
+    if (y >= 1199) return { id: 'yoriie', name: '頼家・実朝期', note: '将軍と北条氏・有力御家人が任官に関わる', bonus: 0.1, strict: 1 };
+    return { id: 'yoritomo', name: '頼朝期', note: '頼朝が御家人の任官を推挙し、管理する（無断の任官は咎めの対象）', bonus: 0.1, strict: 1 }; }
+  function ensureNinkan(s) {
+    if (!s.ninkan) { s.ninkan = { queue: [], senrei: {}, control: {}, log: [] };
+      Object.keys(s.provinces).forEach(function (pid) { var pv = s.provinces[pid]; if (pv.kokushi) return; var nm = pv.name + '守';
+        var hold = Object.keys(s.persons).map(function (k) { return s.persons[k]; }).filter(function (p) { return p.alive && (p.courtOffices || []).indexOf(nm) >= 0; })[0];
+        if (hold) pv.kokushi = { person: hold.id, faction: hold.faction, mode: '遙任', since: s.day, confidence: '史実' }; }); }
+    s.offices = s.offices || []; if (!s.offices.some(function (o) { return o.id === 'kebiishi'; })) s.offices.push({ id: 'kebiishi', name: '検非違使', category: '官職', established: 816, abolished: null, note: '在京が条件' });
+    return s.ninkan;
+  }
+  function jinji(s, fid) { var N = ensureNinkan(s); return N.control[fid] == null ? 50 : N.control[fid]; } // 人事の統制力
+  function addJinji(s, fid, v) { var N = ensureNinkan(s); N.control[fid] = clamp(jinji(s, fid) + v, 0, 100); }
+  function houseOfPerson(s, pid) { var hk = Object.keys(s.houses).filter(function (k) { var h = s.houses[k]; return !h.asFaction && (h.members || []).indexOf(pid) >= 0; })[0]; return hk || (Pn(s, pid) ? Pn(s, pid).faction : null); }
+  function kakushiki(s, id) { // 家の格式：家の人々の官位・官職の重み
+    var ms = s.houses[id] && !s.houses[id].asFaction ? s.houses[id].members.map(function (m) { return Pn(s, m); }) : factionPersons(s, id);
+    return ms.filter(function (p) { return p && p.alive; }).reduce(function (t, p) { return t + (p.courtOffices || []).reduce(function (u, o) { return u + (/守$/.test(o) ? 3 : /検非違使/.test(o) ? 2 : /尉|允|介/.test(o) ? 1 : /大臣|納言|参議|卿/.test(o) ? 5 : 0); }, 0) + (p.rank && /五位/.test(p.rank) ? 2 : p.rank && /[四三二一]位/.test(p.rank) ? 4 : 0); }, 0);
+  }
+  function candidatesFor(s, fid) { // 推挙できる人物：自家の人々、幕府を開いていれば御家人・家の人々も
+    var f = F(s, fid), inHouse = function (pid) { var hk = houseOfPerson(s, pid); return s.houses[hk] && !s.houses[hk].asFaction ? hk : null; };
+    var out = factionPersons(s, fid).filter(function (p) { return !p.captiveOf && !inHouse(p.id); }).map(function (p) { return { id: p.id, own: true }; }); // 家（北条・土肥など）の人々は御家人として扱う
+    if (f && (f.flags || {}).bakufu) retainersOf(s, fid).forEach(function (r) { var ms = r.kind === 'house' ? H(s, r.id).members : factionPersons(s, r.id).map(function (p) { return p.id; }); ms.forEach(function (m) { var p = Pn(s, m); if (p && p.alive && !p.captiveOf && !out.some(function (o) { return o.id === m; })) out.push({ id: m, own: false, via: r.id }); }); });
+    return out;
+  }
+  function nominate(s, fid, cmd) {
+    var f = F(s, fid), N = ensureNinkan(s), d = KAN[cmd.office]; if (!f) return { ok: false, reason: '勢力が不明' }; if (!d) return { ok: false, reason: '官職を選ぶこと' };
+    var c = candidatesFor(s, fid).filter(function (x) { return x.id === cmd.person; })[0], p = Pn(s, cmd.person);
+    if (!c) return { ok: false, reason: (f.flags || {}).bakufu ? '自家・御家人の人物を選ぶこと' : '幕府を開くまでは、自家の人物しか推挙できない' };
+    if (f.flags.choteki) return { ok: false, reason: '朝敵とされている間は任官できない' };
+    if (N.queue.some(function (q) { return q.person === p.id; })) return { ok: false, reason: p.name + 'の任官はすでに申請中' };
+    var pv = null; if (cmd.office === 'kami') { pv = PV(s, cmd.province); if (!pv) return { ok: false, reason: '国を選ぶこと' }; if (pv.kokushi && alive(s, pv.kokushi.person) && topLord(s, Pn(s, pv.kokushi.person).faction) === topLord(s, fid)) return { ok: false, reason: pv.name + '守はすでに味方の' + pname(s, pv.kokushi.person) }; if ((p.courtOffices || []).indexOf(pv.name + '守') >= 0) return { ok: false, reason: 'すでに' + pv.name + '守' }; }
+    if (cmd.office === 'kebiishi' && (p.courtOffices || []).some(function (o) { return /検非違使/.test(o); })) return { ok: false, reason: 'すでに検非違使' };
+    if (cmd.office === 'kebiishi' && /^army:/.test(String(p.location || ''))) return { ok: false, reason: p.name + 'は出陣中。検非違使は在京が条件なので、軍を離れてから' };
+    var gift = Math.max(0, cmd.gift || 0), cost = d.cost + gift; if (f.money < cost) return { ok: false, reason: '銭が足りない（使者と献上に' + cost + '貫）' };
+    var era = ninkanEra(s), hk = houseOfPerson(s, p.id), sen = (N.senrei[hk] || []).indexOf(cmd.office === 'kami' && pv ? pv.name + '守' : d.name) >= 0 || (N.senrei[hk] || []).indexOf(d.name) >= 0;
+    var chiko = pv && topLord(s, pv.kokuga.holder || '') === topLord(s, fid);
+    var pr = clamp(0.15 + courtSupport(s, fid) * 0.45 + ((f.flags || {}).bakufu ? 0.2 : 0) + era.bonus + (chiko ? 0.35 : 0) + (sen ? 0.15 : 0) + jinji(s, fid) / 500 + gift / 2000 + (f.flags.insen ? 0.1 : 0) - (cmd.office === 'kami' && !chiko ? 0.1 : 0), 0.03, 0.95);
+    f.money -= cost; var cap = B(s, f.capital), dist = cap ? travelDays(s, cap.province, B(s, s.court.location).province, 45) : 10;
+    N.queue.push({ id: nid(s, 'nk'), from: fid, person: p.id, office: cmd.office, province: pv ? pv.id : null, mode: cmd.mode === '受領' ? '受領' : '遙任', due: s.day + dist + 10, chance: pr, own: c.own });
+    var msg = '使者を京へ送り、' + p.name + 'の' + (pv ? pv.name + '守' + (cmd.mode === '受領' ? '（受領として赴任）' : '（遙任）') : d.title || d.name) + '任官を' + (c.own ? '申請' : '推挙') + 'した（見込み' + Math.round(pr * 100) + '%' + (chiko ? '・自陣営の知行国' : '') + (sen ? '・家の先例あり' : '') + '。返事まで約' + (dist + 10) + '日）';
+    news(s, msg, { type: 'court', factions: [fid] }); return { ok: true, message: msg };
+  }
+  function applyOffice(s, p, office, provId, mode, fid, why) {
+    var N = ensureNinkan(s), d = KAN[office], t, hk = houseOfPerson(s, p.id);
+    if (office === 'kami') { var pv = PV(s, provId); t = pv.name + '守'; if (pv.kokushi && Pn(s, pv.kokushi.person)) { var op = Pn(s, pv.kokushi.person); op.courtOffices = (op.courtOffices || []).filter(function (o) { return o !== t; }); }
+      pv.kokushi = { person: p.id, faction: p.faction, mode: mode || '遙任', since: s.day, confidence: 'ゲーム展開' };
+      if (mode === '受領') { var bb = Object.keys(s.bases).filter(function (k) { return s.bases[k].province === provId && sameCamp(s, s.bases[k].owner, p.faction); })[0]; if (bb && !/^army:/.test(String(p.location || ''))) p.location = bb; }
+      if (!p.rank || !/位/.test(p.rank)) p.rank = '従五位下'; }
+    else if (office === 'kebiishi') { t = d.title; p.zaikyo = { office: t, since: s.day }; p.location = s.court.location || 'heiankyo'; }
+    else { t = JO_T.filter(function (x) { return (p.courtOffices || []).indexOf(x) < 0; })[0] || '左兵衛尉'; }
+    p.courtOffices = (p.courtOffices || []).filter(function (o) { return o !== t; }).concat([t]);
+    N.senrei[hk] = N.senrei[hk] || []; if (N.senrei[hk].indexOf(t) < 0) N.senrei[hk].push(t);
+    N.log.push({ day: s.day, date: dateStr(s), person: p.id, office: t, why: why }); if (N.log.length > 150) N.log.shift();
+    news(s, '【除目】' + p.name + 'が' + t + (office === 'kami' ? '（' + (mode || '遙任') + '）' : '') + 'に任じられた' + (why ? '（' + why + '）' : ''), { type: 'court', important: true, factions: [p.faction, fid].filter(Boolean) });
+    return t;
+  }
+  function dropOffice(s, p, t, why) { p.courtOffices = (p.courtOffices || []).filter(function (o) { return o !== t; }); if (/検非違使/.test(t)) p.zaikyo = null;
+    Object.keys(s.provinces).forEach(function (pid) { var pv = s.provinces[pid]; if (pv.kokushi && pv.kokushi.person === p.id && pv.name + '守' === t) pv.kokushi = null; });
+    if (why) news(s, p.name + 'は' + t + 'を辞した（' + why + '）', { type: 'court', factions: [p.faction] }); }
+  function resignOffice(s, fid, cmd) { var p = Pn(s, cmd.person); if (!p || !p.alive || topLord(s, p.faction) !== topLord(s, fid)) return { ok: false, reason: '味方の人物を選ぶこと' };
+    var t = (p.courtOffices || []).filter(function (o) { return o === cmd.title || (!cmd.title && /検非違使/.test(o)); })[0]; if (!t) return { ok: false, reason: 'その官職に就いていない' };
+    dropOffice(s, p, t, '主君の命'); if (!/検非違使/.test(t)) return { ok: true, message: p.name + 'は' + t + 'を辞した' };
+    var f = F(s, p.faction), cap = f && B(s, f.capital); p.location = cap ? cap.id : p.location; return { ok: true, message: p.name + 'は検非違使を辞し、' + (cap ? cap.name : '本拠') + 'へ戻る' }; }
+  function ninkanTick(s) { // 日々：申請の結果・在京の条件
+    var N = ensureNinkan(s), due = N.queue.filter(function (q) { return q.due <= s.day; }); N.queue = N.queue.filter(function (q) { return q.due > s.day; });
+    due.forEach(function (q) { var p = Pn(s, q.person), f = F(s, q.from), ok = p && p.alive && rand(s) < q.chance;
+      if (ok) { var t = applyOffice(s, p, q.office, q.province, q.mode, q.from, q.own ? '申請' : '将軍の推挙'); if (!q.own) { var r = retainersOf(s, q.from).filter(function (x) { return x.kind === 'house' ? H(s, x.id).members.indexOf(p.id) >= 0 : x.id === p.faction; })[0]; if (r) { retAddLoyalty(s, r, q.from, 12); addService(s, q.from, r.id, -4); } addJinji(s, q.from, 3); }
+        if (q.from === s.playerFaction) stop(s, { key: 'court', title: '任官：' + p.name, persons: [p.id], text: p.name + 'が' + t + 'に任じられた。' + (q.office === 'kebiishi' ? '\n検非違使は在京が条件のため、' + p.name + 'は京に移った。在任中は京を離れて出陣できない（朝廷タブで辞させれば戻る）。' : q.office === 'kami' && q.mode === '受領' ? '\n受領として任国に赴いた。' : ''), choices: [] }); }
+      else if (p) { news(s, '【除目】' + p.name + 'の任官は見送られた', { type: 'court', factions: [q.from] }); if (q.from === s.playerFaction) stop(s, { key: 'court', title: '任官の結果', text: p.name + 'の任官は見送られた（朝廷・公家の派閥の支持が足りない）。', choices: [] }); } });
+    // 検非違使は在京が条件。京が敵の手に落ちる・京を離れると職を失う
+    Object.keys(s.persons).forEach(function (k) { var p = s.persons[k]; if (!p.alive || !p.zaikyo) return; var loc = B(s, p.location), kyo = B(s, s.court.location || 'heiankyo');
+      var away = !loc || loc.province !== (kyo ? kyo.province : 'yamashiro'); var lost = kyo && kyo.owner && kyo.owner !== 'court' && !sameCamp(s, kyo.owner, p.faction) && atWar(s, kyo.owner, p.faction);
+      if ((away && !/^army:/.test(String(p.location || '')) && s.day - p.zaikyo.since > 3) || lost) dropOffice(s, p, p.zaikyo.office, lost ? '京が敵の手に落ちた' : '京を離れた'); });
+  }
+  function ninkanMonthly(s) {
+    var N = ensureNinkan(s), era = ninkanEra(s);
+    // 受領の収入：任国の国衙領の年貢の一部（受領1割・遙任は目代任せで5%）。家の格式は幕府での影響力になる
+    Object.keys(s.provinces).forEach(function (pid) { var pv = s.provinces[pid], k = pv.kokushi; if (!k) return; var p = Pn(s, k.person); if (!p || !p.alive) { pv.kokushi = null; return; }
+      if (k.mode === '受領') { var here = B(s, p.location) && B(s, p.location).province === pid; if (!here && !/^army:/.test(String(p.location || ''))) { k.awayM = (k.awayM || 0) + 1; if (k.awayM >= 2) { k.mode = '遙任'; news(s, p.name + 'は任国を離れたので、' + pv.name + 'は目代に任せる遙任となった', { type: 'court', factions: [p.faction] }); } } else k.awayM = 0; }
+      var out = Object.keys(s.holdings).reduce(function (t, h) { var x = s.holdings[h]; return t + (x.province === pid && x.type === '国衙領' ? x.output : 0); }, 0), gain = Math.round(out * 0.3 / 12 * (k.mode === '受領' ? 0.1 : 0.05));
+      var pf = F(s, p.faction); if (pf && pf.alive && gain > 0) pf.money += gain; if (k.mode === '受領') pv.unrest = clamp((pv.unrest || 0) - 1, 0, 100); });
+    if (s.shogunate) participants(s).forEach(function (q) { var kk = kakushiki(s, q.id); if (kk) s.shogunate.inf[q.id] = (s.shogunate.inf[q.id] || 0) + Math.min(3, kk * 0.15); });
+    // 朝廷からの国司任命：朝廷の支持の厚い有力者に、勢力の及ぶ国の国守を与えて取り込もうとする
+    Object.keys(s.factions).forEach(function (fid) { var f = s.factions[fid]; if (!f.alive || f.type === '寺社' || fid === 'court' || f.flags.choteki || f.overlord) return; var sup = courtSupport(s, fid); if (sup < 0.3 || rand(s) > 0.03 + sup * 0.04) return;
+      var noble = function (p) { return /[一二三]位/.test(p.rank || '') || (p.courtOffices || []).some(function (o) { return /大臣|納言|参議|大将|督/.test(o); }); }; // 公卿は国守にならない
+      var leader = Pn(s, f.leader); if (leader && leader.alive && noble(leader)) leader = factionPersons(s, fid).filter(function (p) { return !noble(p) && !p.captiveOf && (ageOf(s, p) == null || ageOf(s, p) >= 15) && !(p.courtOffices || []).some(function (o) { return /守$/.test(o); }); }).sort(function (a, b) { return b.abilities.politics - a.abilities.politics; })[0];
+      if (!leader || !leader.alive || (leader.courtOffices || []).some(function (o) { return /守$/.test(o); })) return;
+      var pids = factionBases(s, fid).map(function (b) { return b.province; }).filter(function (pid, i, a) { var pv = PV(s, pid); return a.indexOf(pid) === i && (!pv.kokushi || !alive(s, pv.kokushi.person)); }); if (!pids.length) return; var pid = pids[0];
+      if (fid === s.playerFaction) stop(s, { key: 'kokushi_offer', person: leader.id, province: pid, title: '朝廷から国司の任命', persons: [leader.id], text: '朝廷は' + leader.name + 'を' + PV(s, pid).name + '守に任じようとしている（朝廷の支持' + Math.round(sup * 100) + '）。受けると家の格式と収入が上がるが、朝廷との結びつきも深まる。', choices: [{ id: '受領', label: '受ける（受領として任国に赴く）' }, { id: '遙任', label: '受ける（遙任：目代に任せる）' }, { id: 'decline', label: '辞退する' }] });
+      else applyOffice(s, leader, 'kami', pid, rand(s) < 0.4 ? '受領' : '遙任', fid, '朝廷の任命'); });
+    // 無断任官：在京の御家人に朝廷が直接官職を与える（主君の統制が弱いほど起きやすい）
+    Object.keys(s.persons).forEach(function (k) { var p = s.persons[k]; if (!p.alive || p.captiveOf) return; var loc = B(s, p.location); if (!loc || loc.province !== 'yamashiro') return;
+      var lord = topLord(s, p.faction), lf = F(s, lord); if (!lf || !lf.alive || !(lf.flags || {}).bakufu || lf.leader === p.id || (p.courtOffices || []).some(function (o) { return /検非違使|衛門尉/.test(o); })) return;
+      if ((p.abilities.valor < 65 && (p.ambition || 50) < 60) || rand(s) > 0.04 * (1.5 - jinji(s, lord) / 100)) return;
+      var accept = (p.ambition || 50) >= 55 || (p.loyalty == null ? 60 : p.loyalty) < 75; if (!accept) { news(s, p.name + 'は朝廷からの任官の打診を、主君の許しがないとして辞退した', { type: 'court', factions: [lord] }); addJinji(s, lord, 2); return; }
+      var t = applyOffice(s, p, 'kebiishi', null, null, null, '主君の推挙なし（無断任官）'); p.mudan = { day: s.day, office: t, lord: lord };
+      if (lord === s.playerFaction) stop(s, { key: 'mudan', person: p.id, title: '無断任官：' + p.name, persons: [p.id], text: p.name + 'が主君の推挙を経ずに、朝廷から' + t + 'に任じられた。' + (era.strict >= 2 ? '幕府は御家人の任官に許可を要すると定めている。' : '') + '\n認めれば本人は喜ぶが、人事の統制が緩む（ほかの御家人も勝手に官を求めるようになる）。咎めれば統制は保たれるが、本人は不満を抱く。', choices: [{ id: 'approve', label: '認める' }, { id: 'refuse', label: '叱責して辞退させる' }, { id: 'punish', label: '処罰する（所領を削る）' }] });
+      else { if (rand(s) < 0.5) { dropOffice(s, p, t, '主君の咎め'); p.loyalty = clamp((p.loyalty || 60) - 10, 0, 100); } else addJinji(s, lord, -6); } });
+  }
+  function resolveMudan(s, ev, choiceId) { var p = Pn(s, ev.person), lord = s.playerFaction, era = ninkanEra(s); if (!p || !p.alive || !p.mudan) return '本人はもういない';
+    var t = p.mudan.office, r = retainersOf(s, lord).filter(function (x) { return x.kind === 'house' ? H(s, x.id).members.indexOf(p.id) >= 0 : x.id === p.faction; })[0];
+    if (choiceId === 'approve') { addJinji(s, lord, -10 * era.strict - 5); p.loyalty = clamp((p.loyalty || 60) + 5, 0, 100); return p.name + 'の' + t + 'を認めた（人事の統制が緩んだ）'; }
+    dropOffice(s, p, t, '主君の咎め'); var f = F(s, p.faction), cap = f && B(s, f.capital); if (cap) p.location = cap.id;
+    if (choiceId === 'refuse') { addJinji(s, lord, 6); p.loyalty = clamp((p.loyalty || 60) - 12, 0, 100); if (r) retAddLoyalty(s, r, lord, -6); return p.name + 'を叱責し、' + t + 'を辞退させた'; }
+    addJinji(s, lord, 12); p.loyalty = clamp((p.loyalty || 60) - 25, 0, 100); if (r) { retAddLoyalty(s, r, lord, -15); if (s.politics) addGrudge(s, r.id, lord, 25, '無断任官を咎められ所領を削られた'); }
+    var hk = r && r.kind === 'house' ? Object.keys(s.holdings).filter(function (k) { return s.holdings[k].house === r.id; })[0] : null; if (hk && Object.keys(s.holdings).filter(function (k) { return s.holdings[k].house === r.id; }).length > 1) { s.holdings[hk].house = null; }
+    retainersOf(s, lord).forEach(function (x) { if (x !== r) retAddLoyalty(s, x, lord, -1); }); return p.name + 'を処罰した（統制は強まったが、本人と一門は強く不満を抱いた）';
+  }
   function succession(s, f, dead) {
     if (f.id === 'court') return;
     var fam = (dead.relations || []).filter(function (r) { return /父子|兄弟/.test(r.type); }).map(function (r) { return s.persons[r.person]; })
@@ -3875,6 +3995,8 @@
     if (ev.choices && ev.choices.length && !ev.choices.some(function (c) { return c.id === choiceId; })) return { ok: false, reason: '選択肢が不正: ' + choiceId };
     ev.resolved = true; ev.choice = choiceId;
     var msg = '';
+    if (ev.key === 'kokushi_offer') { var kp = Pn(s, ev.person); if (choiceId === 'decline' || !kp || !kp.alive) return { ok: true, message: '国司の任命を辞退した' }; var tt = applyOffice(s, kp, 'kami', ev.province, choiceId, s.playerFaction, '朝廷の任命'); return { ok: true, message: kp.name + 'は' + tt + '（' + choiceId + '）となった' }; }
+    if (ev.key === 'mudan') return { ok: true, message: resolveMudan(s, ev, choiceId) };
     if (ev.key === 'rewards') { var done0 = [], fid0 = s.playerFaction;
       (ev.helpers || []).forEach(function (h) { if (choiceId === 'later') return; var r1 = bestow(s, fid0, { kind: 'kanjo', target: h }); if (r1.ok) done0.push(h); if (choiceId === 'kanjo') bestow(s, fid0, { kind: 'gift', target: h }); });
       return { ok: true, message: choiceId === 'later' ? '恩賞は追って考える' : done0.length + '家に感状' + (choiceId === 'kanjo' ? 'と引出物' : '') + 'を与えた' }; }
@@ -4001,6 +4123,8 @@
       case 'vassal_command': return vassalCommand(s, cmd.faction, cmd);
       case 'withdraw': return withdrawArmy(s, cmd.faction, cmd.army);
       case 'bestow': return bestow(s, cmd.faction, cmd);
+      case 'nominate': return nominate(s, cmd.faction, cmd);
+      case 'resign_office': return resignOffice(s, cmd.faction, cmd);
       case 'appoint_office': return shikkenAppoint(s, cmd.faction, cmd);
       case 'build_facility': return buildFacility(s, cmd.faction, cmd);
       case 'split_corps': return splitCorps(s, cmd.faction, cmd);
@@ -4083,7 +4207,7 @@
       case 'court_gift': return '朝廷の派閥へ献金' + c.amount + '貫';
       case 'jito': return (s.holdings[c.holding] ? s.holdings[c.holding].name : '') + 'に地頭を置く';
       case 'regime': return (REGIME_ACTS[c.action] || {}).label || '体制の施策';
-      case 'bakufu': return '幕府政治'; case 'reform': return (REFORMS[c.kind] || {}).label || '制度改革'; case 'bestow': return '御恩：' + ((BESTOW[c.kind] || {}).label || ''); case 'withdraw': return (s.armies[c.army] ? armyLabel(s, s.armies[c.army]) : '軍勢') + 'の退却'; case 'vassal_command': return '御家人への命：' + ({ muster: '兵を増やせ', recall: '帰陣', attack: '出陣', defend: '守り', join: '軍団に加われ' }[c.act] || ''); case 'vassal_order': return '指図：' + ({ attack: '出陣の要請', defend: '守りの要請', join: '軍団への合流' }[c.act] || ''); case 'politics': return { consult: '合議', guard: '警固', spy: '諜報', divide: '切り崩し', strike: '反対派の弾圧', compromise: '妥協', retire: '隠居' }[c.act] || '政治'; case 'appoint_office': return '幕府の人事';
+      case 'bakufu': return '幕府政治'; case 'reform': return (REFORMS[c.kind] || {}).label || '制度改革'; case 'nominate': return '任官の推挙：' + (Pn(s, c.person) ? Pn(s, c.person).name : '') + ((KAN[c.office] || {}).name ? '（' + KAN[c.office].name + '）' : ''); case 'resign_office': return '官を辞させる'; case 'bestow': return '御恩：' + ((BESTOW[c.kind] || {}).label || ''); case 'withdraw': return (s.armies[c.army] ? armyLabel(s, s.armies[c.army]) : '軍勢') + 'の退却'; case 'vassal_command': return '御家人への命：' + ({ muster: '兵を増やせ', recall: '帰陣', attack: '出陣', defend: '守り', join: '軍団に加われ' }[c.act] || ''); case 'vassal_order': return '指図：' + ({ attack: '出陣の要請', defend: '守りの要請', join: '軍団への合流' }[c.act] || ''); case 'politics': return { consult: '合議', guard: '警固', spy: '諜報', divide: '切り崩し', strike: '反対派の弾圧', compromise: '妥協', retire: '隠居' }[c.act] || '政治'; case 'appoint_office': return '幕府の人事';
       case 'spoil': return '没官領の処分'; case 'ando': return '本領安堵'; case 'grant': return '新恩給与'; case 'confiscate': return '所領の没収';
       case 'build_facility': return (FACILITIES[c.kind] || {}).label + 'の普請'; case 'split_corps': return '軍団の分割';
       case 'set_heir': return pname(s, c.person) + 'を後継者に';
@@ -4170,7 +4294,7 @@
     if (!s || !s.engineVersion || !s.factions || !s.date) throw new Error('セーブデータの形式が不正');
     if (s.engineVersion.split('.')[0] !== ENGINE_VERSION.split('.')[0]) throw new Error('エンジンのメジャーバージョンが異なる');
     s.corps = s.corps || {}; s.recruits = s.recruits || []; s.constructions = s.constructions || {};
-    ensureCourt(s); ensureHoldings(s); ensureRegime(s); migrateHouses(s); migrateHouses3(s); migrateHouses4(s); ensurePlayer(s); ensurePolitics(s); s.options.goal = s.options.goal || 'unify'; s.objectives = s.objectives || {};
+    ensureCourt(s); ensureHoldings(s); ensureRegime(s); migrateHouses(s); migrateHouses3(s); migrateHouses4(s); ensurePlayer(s); ensurePolitics(s); ensureNinkan(s); s.options.goal = s.options.goal || 'unify'; s.objectives = s.objectives || {};
     return s;
   }
   function summary(s) {
@@ -4207,7 +4331,7 @@
     version: ENGINE_VERSION,
     createGame: createGame, advanceDay: advanceDay, runDays: runDays, runUntilMonthEnd: runUntilMonthEnd,
     issueCommand: issueCommand, BUILD: BUILD, buildRights: buildRights, INSTITUTIONS: INSTITUTIONS, bakufuCheck: bakufuCheck,
-    unifyStatus: unifyStatus, killPerson: killPerson, shogunState: shogunState, clanStatus: clanStatus, arrivalsTick: arrivalsTick, ARRIVALS: ARRIVALS, politicalStatus: politicalStatus, orderRetainer: orderRetainer, vassalCommand: vassalCommand, houseRecruitRoom: houseRecruitRoom, addService: addService, BESTOW: BESTOW, bestow: bestow, cabalView: cabalView, grudge: grudge, addGrudge: addGrudge, successorCandidates: successorCandidates, candidateInfo: candidateInfo, openSelection: openSelection, applySuccessor: applySuccessor, politicsMonthly: politicsMonthly, cabalTick: cabalTick, tryAssassinate: tryAssassinate, fallPerson: fallPerson, politicsAct: politicsAct, canLead: canLead, ensurePolitics: ensurePolitics, supportFrom: supportFrom, shogunTick: shogunTick, clanTick: clanTick, houseDrift: houseDrift, bakufuChart: bakufuChart, pendingSpoils: pendingSpoils, kinship: kinship, serviceOf: serviceOf, loyaltyTick: loyaltyTick, transferPlayer: transferPlayer, participants: participants, shikkenStatus: shikkenStatus, REFORMS: REFORMS, tie: tie, pName: pName, shogunTie: shogunTie, reformSupport: reformSupport, birthsTick: birthsTick, shogunateTick: shogunateTick, retainersOf: retainersOf, retLoyalty: retLoyalty, landCategory: landCategory, houseTroops: houseTroops, houseHoldings: houseHoldings, houseBands: houseBands, FACILITIES: FACILITIES, ROUTES: ROUTES, houseToFaction: houseToFaction, joinDecision: joinDecision, regimeOf: regimeOf, regimeHouses: regimeHouses, REGIME_ACTS: REGIME_ACTS, heirScore: heirScore, distributeIncome: distributeIncome, jitoAllowed: jitoAllowed, SHARES: SHARES, supplyAt: supplyAt, foodPrice: foodPrice, baseFoodCap: baseFoodCap, DIFFICULTY: DIFFICULTY, GOALS: GOALS, objectiveStatus: objectiveStatus, courtSupport: courtSupport, cliqueAtt: cliqueAtt, insenAvailable: insenAvailable, risesBy: risesBy,
+    unifyStatus: unifyStatus, killPerson: killPerson, shogunState: shogunState, clanStatus: clanStatus, arrivalsTick: arrivalsTick, ARRIVALS: ARRIVALS, politicalStatus: politicalStatus, orderRetainer: orderRetainer, vassalCommand: vassalCommand, KAN: KAN, ninkanEra: ninkanEra, nominate: nominate, candidatesFor: candidatesFor, kakushiki: kakushiki, jinji: jinji, ninkanMonthly: ninkanMonthly, ninkanTick: ninkanTick, applyOffice: applyOffice, houseOfPerson: houseOfPerson, houseRecruitRoom: houseRecruitRoom, addService: addService, BESTOW: BESTOW, bestow: bestow, cabalView: cabalView, grudge: grudge, addGrudge: addGrudge, successorCandidates: successorCandidates, candidateInfo: candidateInfo, openSelection: openSelection, applySuccessor: applySuccessor, politicsMonthly: politicsMonthly, cabalTick: cabalTick, tryAssassinate: tryAssassinate, fallPerson: fallPerson, politicsAct: politicsAct, canLead: canLead, ensurePolitics: ensurePolitics, supportFrom: supportFrom, shogunTick: shogunTick, clanTick: clanTick, houseDrift: houseDrift, bakufuChart: bakufuChart, pendingSpoils: pendingSpoils, kinship: kinship, serviceOf: serviceOf, loyaltyTick: loyaltyTick, transferPlayer: transferPlayer, participants: participants, shikkenStatus: shikkenStatus, REFORMS: REFORMS, tie: tie, pName: pName, shogunTie: shogunTie, reformSupport: reformSupport, birthsTick: birthsTick, shogunateTick: shogunateTick, retainersOf: retainersOf, retLoyalty: retLoyalty, landCategory: landCategory, houseTroops: houseTroops, houseHoldings: houseHoldings, houseBands: houseBands, FACILITIES: FACILITIES, ROUTES: ROUTES, houseToFaction: houseToFaction, joinDecision: joinDecision, regimeOf: regimeOf, regimeHouses: regimeHouses, REGIME_ACTS: REGIME_ACTS, heirScore: heirScore, distributeIncome: distributeIncome, jitoAllowed: jitoAllowed, SHARES: SHARES, supplyAt: supplyAt, foodPrice: foodPrice, baseFoodCap: baseFoodCap, DIFFICULTY: DIFFICULTY, GOALS: GOALS, objectiveStatus: objectiveStatus, courtSupport: courtSupport, cliqueAtt: cliqueAtt, insenAvailable: insenAvailable, risesBy: risesBy,
     estimateOdds: estimateOdds, armyQuality: armyQuality, personFree: personFree, personNear: personNear,
     recruitInfo: recruitInfo, histEventStatus: histEventStatus, sortieSources: sortieSources, oddsFor: oddsFor, parseCommand: parseCommand, resolveEvent: resolveEvent,
     save: save, load: load, validate: validate, summary: summary,

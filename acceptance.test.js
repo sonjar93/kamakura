@@ -623,4 +623,33 @@ ok('57. 御家人全体への命令：兵を増やせ（各家が自分の銭で
   const rc = E.issueCommand(t, { type: 'vassal_command', faction: 'yoritomo', act: 'recall' }); assert(rc.ok || /出ている/.test(rc.reason));
 });
 ok('58. 比企氏は本領の比企郡に館を持つ', () => { const s = izuStart(1); assert(s.bases.hiki_kan && s.bases.hiki_kan.province === 'musashi' && s.houses.hiki.seat === 'hiki_kan'); assert.strictEqual(s.holdings.hiki_go.house, 'hiki'); });
+
+function bakufuWorld(seed) { const s = izuStart(seed); const y = s.factions.yoritomo; y.flags.bakufu = true; y.status = '挙兵'; s.bases.kamakura.owner = 'yoritomo'; y.capital = 'kamakura'; y.money = 5000; ['miura', 'chiba'].forEach(k => s.factions[k].overlord = 'yoritomo'); return s; }
+ok('59. 任官の推挙：幕府を開く前は自家の人物だけ、開いた将軍は御家人を推挙できる。使者の返事を待って任じられ、家の先例として残る', () => {
+  const s0 = izuStart(8); s0.factions.yoritomo.money = 3000; assert(!E.issueCommand(s0, { type: 'nominate', faction: 'yoritomo', person: 'sanehira', office: 'jo' }).ok, '幕府前は御家人を推挙できない');
+  const s = bakufuWorld(8); const r = E.issueCommand(s, { type: 'nominate', faction: 'yoritomo', person: 'sanehira', office: 'kami', province: 'sagami', mode: '受領' }); assert(r.ok, r.reason);
+  s.ninkan.queue[0].chance = 1; const L0 = E.retLoyalty(s, E.retainersOf(s, 'yoritomo').find(x => x.id === 'doi'), 'yoritomo');
+  for (let d = 0; d < 60 && s.ninkan.queue.length; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); }
+  assert((s.persons.sanehira.courtOffices || []).includes('相模守'), '相模守に任じられた'); assert.strictEqual(s.provinces.sagami.kokushi.person, 'sanehira'); assert(s.provinces.sagami.kokushi.mode === '受領' || s.provinces.sagami.kokushi.mode === '遙任');
+  assert(E.retLoyalty(s, E.retainersOf(s, 'yoritomo').find(x => x.id === 'doi'), 'yoritomo') > L0, '推挙で忠誠が上がる'); assert(s.ninkan.senrei.doi.includes('相模守'), '家の先例'); assert(E.kakushiki(s, 'doi') >= 3, '家の格式');
+  const m0 = s.factions.yoritomo.money; E.ninkanMonthly(s); assert(s.factions.yoritomo.money >= m0, '任国の国衙の収入');
+  assert(E.ninkanEra(s).id === 'yoritomo'); s.date = { y: 1215, m: 1, leap: false, d: 1 }; assert.strictEqual(E.ninkanEra(s).strict, 2, '1214年以後は統制が厳しい');
+});
+ok('60. 検非違使は在京が条件：任じられると京へ移り、出陣できない。辞せば戻る。京が敵の手に落ちると職を失う', () => {
+  const s = bakufuWorld(9); const p = s.persons.yoshimori; E.applyOffice(s, p, 'kebiishi', null, null, 'yoritomo', 'テスト');
+  assert(p.zaikyo && /検非違使/.test(p.courtOffices.join()), '検非違使'); assert.strictEqual(E.util.personFree ? E.util.personFree(s, p.id, 'yoritomo') : false, false, '出陣できない');
+  assert.strictEqual(s.bases[p.location].province, 'yamashiro', '京へ移った');
+  const r = E.issueCommand(s, { type: 'resign_office', faction: 'yoritomo', person: 'yoshimori' }); assert(r.ok, r.reason); assert(!p.zaikyo && !/検非違使/.test(p.courtOffices.join()), '辞した');
+  E.applyOffice(s, p, 'kebiishi', null, null, 'yoritomo', 'テスト'); p.location = 'kamakura'; s.day += 5; E.ninkanTick(s); assert(!p.zaikyo, '京を離れると職を失う');
+});
+ok('61. 無断任官：在京の御家人に朝廷が直接官を与えることがあり、将軍は認める・叱責・処罰を選ぶ（統制力が変わる）。朝廷から国司に任じられることもある', () => {
+  let ev = null, s = null;
+  for (let seed = 1; seed <= 30 && !ev; seed++) { s = bakufuWorld(seed); const p = s.persons.yoshimori; p.location = 'heiankyo'; p.ambition = 80; p.abilities.valor = 85; s.ninkan.control.yoritomo = 0;
+    for (let m = 0; m < 12 && !ev; m++) { E.ninkanMonthly(s); ev = s.pendingStops.find(e => e.key === 'mudan' && !e.resolved); } }
+  assert(ev, '無断任官の場面'); const j0 = E.jinji(s, 'yoritomo'); const r = E.resolveEvent(s, ev.id, 'punish'); assert(r.ok); assert(E.jinji(s, 'yoritomo') > j0, '処罰で統制が強まる'); assert(!s.persons.yoshimori.zaikyo, '官を失う');
+  let offered = false; for (let seed = 1; seed <= 20 && !offered; seed++) { const t = bakufuWorld(seed); t.factions.yoritomo.overlord = null; t.court.cliques && Object.values(t.court.cliques).forEach(c => { c.attitude = c.attitude || {}; c.attitude.yoritomo = 90; c.favor = c.favor || {}; c.favor.yoritomo = 90; });
+    for (let m = 0; m < 36 && !offered; m++) { E.ninkanMonthly(t); offered = t.pendingStops.some(e => e.key === 'kokushi_offer') || Object.values(t.provinces).some(pv => pv.kokushi && pv.kokushi.person === 'yoritomo'); } }
+  assert(offered, '朝廷から国司の任命が来る');
+  const s2 = izuStart(1); assert(Object.values(s2.provinces).some(pv => pv.kokushi && s2.persons[pv.kokushi.person]), '開始時の国守（史実）が国ごとに入る');
+});
 console.log(`\n${n} 件の受入条件をすべて満たした`);

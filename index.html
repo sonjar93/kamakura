@@ -296,7 +296,7 @@ select,input,textarea{font:inherit;border:1px solid var(--line);border-radius:6p
   <div class="mbody">
     <div class="row"><button class="btn" id="copySave">現在の状態をコピー</button><span id="copyMsg" class="small"></span></div>
     <textarea id="saveText" rows="8" style="width:100%;font-family:monospace;font-size:11px" placeholder="セーブデータ（JSON）を貼り付けて「読み込む」"></textarea>
-    <div class="row"><button class="btn" id="doLoad">貼り付けたデータを読み込む</button><button class="btn sub" id="loadLocal">ブラウザの自動セーブから復元</button></div>
+    <div class="row"><button class="btn" id="doLoad">貼り付けたデータを読み込む</button><button class="btn sub" id="loadLocal">自動セーブから復元</button><button class="btn sub" id="loadPrev">1か月前の自動セーブ</button></div><div class="small muted" style="margin-top:4px">自動セーブは毎月1日に行う。月が変わると、それまでの分を「1か月前」として残す（このブラウザだけに保存される）。</div>
   </div>
   <div class="mfoot"><button class="btn sub" data-close>閉じる</button></div>
 </div></div>
@@ -363,7 +363,7 @@ $('loadFromStart').onclick=function(){ $('start').classList.remove('on'); $('sav
 
 // ================================================================ 時間
 var SPD=[0,900,260,60];
-var lastSpeed=1, tickCost=0;
+var lastSpeed=1, tickCost=0, lastAutoM=null;
 // 時間の進行：1日ぶんの処理と描画が終わってから次を予約する（重い場面でもクリックやキーが必ず通るように）
 function setSpeed(v){ speed=v; if(v>0) lastSpeed=v; [].forEach.call(document.querySelectorAll('#speed button'),function(b){b.classList.toggle('on',+b.dataset.s===v);}); if(timer) clearTimeout(timer); timer=null; if(v>0) timer=setTimeout(loopTick,Math.min(SPD[v],200)); }
 function loopTick(){ timer=null; if(!S||!speed) return; var t0=performance.now(); tick(); tickCost=performance.now()-t0; if(speed>0&&!timer) timer=setTimeout(loopTick,Math.max(SPD[speed]-tickCost, tickCost*0.5+16)); }
@@ -397,14 +397,18 @@ function animFrame(now){
 }
 function advanceAnimated(dur){
   var snap=snapshotMovers(); var r=E.advanceDay(S);
-  if(S.date.d===1) autosave();
+  if(S.date.d===1&&S.date.m!==lastAutoM){ lastAutoM=S.date.m; autosave(); }
   render(true); startAnim(snap,dur); animFrame(performance.now());
   return r;
 }
 function tick(){ if(!S) return; if(S.flags.gameOver){ setSpeed(0); return; } var r=advanceAnimated(SPD[speed]*0.95); if(r.blocked||r.stops.length) setSpeed(0); showStops(); }
 $('step1').onclick=function(){ if(!S) return; setSpeed(0); advanceAnimated(700); showStops(); };
 $('stepM').onclick=function(){ if(!S) return; setSpeed(0); E.runUntilMonthEnd(S); autosave(); render(); showStops(); };
-function autosave(){ try{ localStorage.setItem('genpei_autosave',E.save(S)); }catch(e){} }
+// 自動セーブ：毎月1日。月が変わったら、それまでの分を「1か月前」として残す（2つまで）
+function autosave(){ try{ var key=S.date.y+'-'+S.date.m+(S.date.leap?'L':''), meta=JSON.parse(localStorage.getItem('genpei_autosave_meta')||'{}');
+  if(meta.cur&&meta.cur!==key){ var old=localStorage.getItem('genpei_autosave'); if(old){ localStorage.setItem('genpei_autosave_prev',old); meta.prev=meta.cur; meta.prevLabel=meta.curLabel; } }
+  localStorage.setItem('genpei_autosave',E.save(S)); meta.cur=key; meta.curLabel=U.dateStr(S); localStorage.setItem('genpei_autosave_meta',JSON.stringify(meta)); updAutoBtns(); }catch(e){} }
+function updAutoBtns(){ try{ var meta=JSON.parse(localStorage.getItem('genpei_autosave_meta')||'{}'); if($('loadLocal')) $('loadLocal').textContent='自動セーブから復元'+(meta.curLabel?'（'+meta.curLabel.replace(/（.*）/,'')+'）':''); if($('loadPrev')){ $('loadPrev').textContent='1か月前の自動セーブ'+(meta.prevLabel?'（'+meta.prevLabel.replace(/（.*）/,'')+'）':''); $('loadPrev').disabled=!localStorage.getItem('genpei_autosave_prev'); } }catch(e){} }
 document.addEventListener('keyup',function(e){ if((e.key===' '||e.code==='Space')&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) e.preventDefault(); },true); // ボタンにフォーカスがあってもスペースで押されないように
 document.addEventListener('keydown',function(e){ if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||!S) return;
   if(e.key===' '||e.code==='Space'){ e.preventDefault(); if(e.repeat) return; if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); setSpeed(speed?0:lastSpeed); } if(e.key==='.') $('step1').click(); if(e.key==='Escape'){ cancelCommand(); hidePop(); } });
@@ -1240,9 +1244,26 @@ TABS.diplomacy=function(f,fid){
   h+='<div class="card"><h3>関係</h3><table class="t">'+Object.keys(S.factions).filter(function(k){return S.factions[k].alive&&k!==base;}).map(function(k){ var r=U.rel(S,base,k); return '<tr><td>'+fsw(k)+esc(S.factions[k].name)+'</td><td>'+(U.atWar(S,base,k)?'<span class="chip red">交戦</span>':'<span class="chip">'+esc(r.status)+'</span>')+'</td><td class="num">'+Math.round(r.value)+'</td></tr>'; }).join('')+'</table></div>';
   return h;
 };
+function ninkanCard(f,fid){
+  if(!f||!S.ninkan) return ''; var era=E.ninkanEra(S), K=E.KAN, cands=E.candidatesFor(S,fid), N=S.ninkan, camp=U.topLord(S,fid);
+  var pvs=Object.keys(S.provinces).map(function(k){return S.provinces[k];}).sort(function(a,b){ var ca=U.topLord(S,a.kokuga.holder||'')===camp?0:1, cb=U.topLord(S,b.kokuga.holder||'')===camp?0:1; return ca-cb; });
+  var h='<div class="card" style="border-color:#3b3f8f"><h3>🏛 任官（官位・官職）</h3><div class="small">官位・官職は朝廷が任じる（幕府の役職＝侍所別当・執権などとは別）。家の格式になり、幕府での影響力にも加わる。<br><b>いまの制度：'+esc(era.name)+'</b>　'+esc(era.note)+'<br>人事の統制力 <b>'+Math.round(E.jinji(S,fid))+'</b>（低いと御家人が主君を通さず任官しやすい）　自家の格式 <b>'+E.kakushiki(S,fid)+'</b></div>';
+  h+='<table class="t" style="margin-top:4px">'+Object.keys(K).map(function(k){return '<tr><td><b>'+esc(K[k].title||K[k].name)+'</b></td><td class="num">'+K[k].cost+'貫</td><td class="small">'+esc(K[k].note)+'</td></tr>';}).join('')+'</table>';
+  h+='<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><select id="nkP">'+cands.map(function(c){var p=S.persons[c.id];return opt(c.id,p.name+(c.own?'':'（'+(S.houses[c.via]?S.houses[c.via].name:fnm(c.via).replace(/（.*）/,''))+'）')+((p.courtOffices||[]).length?'・'+p.courtOffices.slice(-1)[0]:''));}).join('')+'</select>'+
+    '<select id="nkO"><option value="kami">国守（受領として赴任）</option><option value="kamiy">国守（遙任）</option><option value="kebiishi">検非違使（在京）</option><option value="jo">衛府の尉</option></select>'+
+    '<select id="nkV">'+pvs.map(function(pv){var mine=U.topLord(S,pv.kokuga.holder||'')===camp, k=pv.kokushi; return opt(pv.id,pv.name+(mine?'★知行国':'')+(k&&S.persons[k.person]?'（守 '+S.persons[k.person].name+'）':''));}).join('')+'</select>'+
+    '<label class="small">献上 <input id="nkG" type="number" value="0" min="0" step="50" style="width:70px"></label><button class="btn" id="bNk">使者を京へ送る</button></div>'+
+    '<div class="small muted">'+((f.flags||{}).bakufu?'将軍として御家人の任官を推挙できる。推挙で任じられた家は忠誠が上がり、奉公が報われる。':'幕府を開くまでは自家の人物の申請だけ。幕府を開くと御家人の推挙ができる。')+'自陣営の知行国（★）の国守は通りやすい。家に同じ官の先例があると通りやすい。</div>';
+  var mine=Object.keys(S.persons).map(function(k){return S.persons[k];}).filter(function(p){return p.alive&&(p.courtOffices||[]).length&&U.topLord(S,p.faction)===camp;});
+  if(mine.length) h+='<div style="margin-top:6px"><b class="small">味方の官位・官職</b></div>'+mine.map(function(p){ var kk=Object.keys(S.provinces).filter(function(pid){var x=S.provinces[pid].kokushi;return x&&x.person===p.id;}).map(function(pid){return S.provinces[pid].name+'守（'+S.provinces[pid].kokushi.mode+'）';});
+    return '<div class="small">'+esc(p.name)+'：'+esc(p.courtOffices.join('・'))+(p.rank?'（'+esc(p.rank)+'）':'')+(kk.length?' <span class="muted">'+esc(kk.join('・'))+'</span>':'')+(p.zaikyo?' <span class="chip">在京</span> <button class="btn sub sm" data-resign="'+p.id+'">辞して戻る</button>':'')+'</div>'; }).join('');
+  var q=(N.queue||[]).filter(function(x){return x.from===fid;}); if(q.length) h+='<div style="margin-top:6px"><b class="small">返事待ち</b></div>'+q.map(function(x){return '<div class="small">'+esc(S.persons[x.person].name)+'：'+esc(x.office==='kami'?S.provinces[x.province].name+'守':(K[x.office].title||K[x.office].name))+'（見込み'+Math.round(x.chance*100)+'%・あと'+Math.max(0,x.due-S.day)+'日）</div>';}).join('');
+  var lg=(N.log||[]).slice(-6).reverse(); if(lg.length) h+='<div style="margin-top:6px"><b class="small">近ごろの除目</b></div>'+lg.map(function(x){return '<div class="small"><span class="muted">'+esc(x.date.replace(/（.*）/,''))+'</span> '+esc(S.persons[x.person]?S.persons[x.person].name:'')+'：'+esc(x.office)+(x.why?'（'+esc(x.why)+'）':'')+'</div>';}).join('');
+  return h+'</div>';
+}
 TABS.court=function(f,fid){
   var c=S.court, pn=function(id){return id&&P(id)?esc(P(id).name)+(P(id).alive?'':'（故）'):'<span class="muted">空席／未設定</span>';};
-  var h='<div class="card"><h3>朝廷</h3><dl class="kv"><dt>所在</dt><dd>'+esc(S.bases[c.location].name)+'</dd><dt>天皇</dt><dd>'+pn(c.emperor)+(c.gaiseki?' <span class="small muted">外戚：'+esc(fnm(c.gaiseki).replace(/（.*）/,''))+'</span>':'')+'</dd>'+(c.rivalEmperor&&P(c.rivalEmperor.person)&&P(c.rivalEmperor.person).alive?'<dt>都を離れた帝</dt><dd>'+pn(c.rivalEmperor.person)+(c.rivalEmperor.with?'（'+esc(fnm(c.rivalEmperor.with))+'のもと）':'')+'</dd>':'')+'<dt>院政</dt><dd>'+pn(c.cloisteredEmperor)+'</dd><dt>法皇</dt><dd>'+pn(c.dharmaEmperor)+(c.dharmaEmperorConfined?' <span class="chip red">幽閉中（院宣は出ない）</span>':'')+'</dd><dt>'+esc(c.regentTitle)+'</dt><dd>'+pn(c.regent)+'</dd><dt>左大臣</dt><dd>'+pn(c.ministers.sadaijin)+'</dd><dt>右大臣</dt><dd>'+pn(c.ministers.udaijin)+'</dd><dt>朝廷を主導</dt><dd>'+fsw(c.controller)+esc(fnm(c.controller))+'</dd></dl></div>';
+  var h=ninkanCard(f,fid)+'<div class="card"><h3>朝廷</h3><dl class="kv"><dt>所在</dt><dd>'+esc(S.bases[c.location].name)+'</dd><dt>天皇</dt><dd>'+pn(c.emperor)+(c.gaiseki?' <span class="small muted">外戚：'+esc(fnm(c.gaiseki).replace(/（.*）/,''))+'</span>':'')+'</dd>'+(c.rivalEmperor&&P(c.rivalEmperor.person)&&P(c.rivalEmperor.person).alive?'<dt>都を離れた帝</dt><dd>'+pn(c.rivalEmperor.person)+(c.rivalEmperor.with?'（'+esc(fnm(c.rivalEmperor.with))+'のもと）':'')+'</dd>':'')+'<dt>院政</dt><dd>'+pn(c.cloisteredEmperor)+'</dd><dt>法皇</dt><dd>'+pn(c.dharmaEmperor)+(c.dharmaEmperorConfined?' <span class="chip red">幽閉中（院宣は出ない）</span>':'')+'</dd><dt>'+esc(c.regentTitle)+'</dt><dd>'+pn(c.regent)+'</dd><dt>左大臣</dt><dd>'+pn(c.ministers.sadaijin)+'</dd><dt>右大臣</dt><dd>'+pn(c.ministers.udaijin)+'</dd><dt>朝廷を主導</dt><dd>'+fsw(c.controller)+esc(fnm(c.controller))+'</dd></dl></div>';
   var cl=c.cliques||{}, tot=Object.keys(cl).reduce(function(t,k){return t+cl[k].influence;},0)||1;
   h+='<div class="card"><h3>朝廷の派閥</h3><div class="small muted">影響力の大きい派閥ほど、任官・追討・院宣の審議を左右する。態度は史実上の傾き＋いまの状況（都の支配・正当性・朝敵）＋献金の恩で決まり、毎月少しずつ動く。</div>';
   Object.keys(cl).forEach(function(k){ var x=cl[k], a=fid?Math.round(E.cliqueAtt(S,x,fid)):null, ac=a==null?'':(a>=30?'ok':a<=-30?'ng':'');
@@ -1409,6 +1430,8 @@ function bindLeft(){
   if(q('bTs')) q('bTs').onclick=function(){ run({type:'petition',kind:'tsuito',target:q('tsT').value}); };
   if(q('bIn')) q('bIn').onclick=function(){ run({type:'petition',kind:'insen',target:q('inT').value||null}); };
   Array.prototype.forEach.call(document.querySelectorAll('[data-gift]'),function(b){ b.onclick=function(){ var k=b.getAttribute('data-gift'); run({type:'court_gift',clique:k,amount:+document.querySelector('[data-gamt="'+k+'"]').value}); }; });
+  if(q('bNk')) q('bNk').onclick=function(){ var o=q('nkO').value; run({type:'nominate',person:q('nkP').value,office:o==='kamiy'?'kami':o,mode:o==='kami'?'受領':'遙任',province:q('nkV').value,gift:+q('nkG').value||0}); };
+  [].forEach.call(document.querySelectorAll('[data-resign]'),function(b){ b.onclick=function(){ run({type:'resign_office',person:b.dataset.resign}); }; });
   if(q('bAp')) q('bAp').onclick=function(){ run({type:'petition',kind:'appointment',person:q('apP').value,office:q('apO').value,gift:+q('apG').value}); };
   if(q('bBaku')) q('bBaku').onclick=function(){ run({type:'found_bakufu'}); };
   if(q('psF')) q('psF').onchange=function(){ window._psF=q('psF').value; renderLeft(); };
@@ -1459,11 +1482,12 @@ function ticker(){
 setInterval(function(){ var now=Date.now(), box=$('ticker'); tickItems=tickItems.filter(function(it){ var el=box.querySelector('[data-k="'+it.key+'"]'); if(now-it.t>9000){ if(el){ el.classList.add('old'); setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); },700); } return false; } return true; }); },1000);
 
 // ================================================================ セーブ
-$('saveBtn').onclick=function(){ setSpeed(0); $('saveText').value=''; $('copyMsg').textContent=''; $('savemodal').classList.add('on'); };
+$('saveBtn').onclick=function(){ setSpeed(0); updAutoBtns(); $('saveText').value=''; $('copyMsg').textContent=''; $('savemodal').classList.add('on'); };
 [].forEach.call(document.querySelectorAll('[data-close]'),function(b){ b.onclick=function(){ b.closest('.modal').classList.remove('on'); }; });
 $('copySave').onclick=function(){ if(!S) return; var t=E.save(S); $('saveText').value=t; try{ navigator.clipboard.writeText(t).then(function(){ $('copyMsg').textContent='コピーしました（'+Math.round(t.length/1024)+'KB）'; },function(){ $('saveText').select(); $('copyMsg').textContent='欄を選択してコピーしてください'; }); }catch(e){ $('saveText').select(); } };
 function doLoad(txt){ try{ S=E.load(txt); $('savemodal').classList.remove('on'); $('start').classList.remove('on'); seenLog=S.log.length; terrSig=''; home(); render(); toast('✓ 読み込んだ（'+U.dateStr(S)+'）',true); }catch(e){ $('copyMsg').textContent='読み込み失敗：'+e.message; } }
 $('doLoad').onclick=function(){ doLoad($('saveText').value); };
+$('loadPrev').onclick=function(){ try{ var t=localStorage.getItem('genpei_autosave_prev'); if(t) doLoad(t); else $('copyMsg').textContent='1か月前の自動セーブがありません'; }catch(e){ $('copyMsg').textContent='ブラウザ保存が使えません'; } };
 $('loadLocal').onclick=function(){ try{ var t=localStorage.getItem('genpei_autosave'); if(t) doLoad(t); else $('copyMsg').textContent='自動セーブがありません'; }catch(e){ $('copyMsg').textContent='ブラウザ保存が使えません'; } };
 window.addEventListener('resize',function(){ if(S) scheduleRedraw(); });
 if(window.innerWidth<820){ $('left').classList.add('closed'); }
