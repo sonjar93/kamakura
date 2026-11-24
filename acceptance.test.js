@@ -81,7 +81,7 @@ ok('10. 館の普請：規模に応じて数か月かかり、完成すると拠
   let r = E.issueCommand(s, { type: 'build', province: 'mutsu', scale: 'small' }); assert(!r.ok && /権利/.test(r.reason), '権利のない国には建てられない');
   r = E.issueCommand(s, { type: 'build', province: 'harima', scale: 'medium', name: '播磨の城館', x: 600, y: 790 }); assert(r.ok, r.reason);
   const n0 = Object.keys(s.bases).length; let d = 0;
-  while (Object.keys(s.bases).length === n0 && d < 400) { clear(s); E.advanceDay(s); d++; }
+  while (!s.bases['built_' + r.id] && d < 400) { clear(s); E.advanceDay(s); d++; } // CPU も普請するので自分の城館の完成を待つ
   assert(d >= 90, '城館の完成まで ' + d + ' 日'); assert(s.bases['built_' + r.id] && s.bases['built_' + r.id].owner === 'heike');
   const p = E.parseCommand(s, '相模国に城館を築く'); assert.strictEqual(p.cmd.type, 'build'); assert.strictEqual(p.cmd.scale, 'medium');
 });
@@ -474,7 +474,7 @@ function cabalWorld(seed) {
   ['hiki', 'doi', 'miura', 'chiba'].forEach(k => { E.addGrudge(s, k, 'hojo', 80, '所領を没収された'); sg.inf[k] = 60; }); sg.inf.hojo = 30; return s;
 }
 ok('43. 反対派は段階を踏む（不満→対立→要求）。要求を受け入れれば収まり、拒めば実力行使（失脚など）に進むことがある', () => {
-  const s = cabalWorld(54); const P = s.politics;
+  const s = cabalWorld(54); const P = s.politics; ['hiki', 'doi', 'miura', 'chiba'].forEach(k => { const h = s.houses[k] && !s.houses[k].asFaction ? s.houses[k].head : s.factions[k].leader; if (s.persons[h]) s.persons[h].ambition = Math.min(60, s.persons[h].ambition); }); // 急な政変（乱数）を除き、段階の進みを確かめる
   E.cabalTick(s); const c = P.cabals.find(x => x.target === 'hojo'); assert(c && c.members.length >= 2 && c.stage <= 2, '反対派の結成');
   const seen = [c.stage]; for (let i = 0; i < 3 && c.stage < 3; i++) { E.cabalTick(s); seen.push(c.stage); } assert.strictEqual(c.stage, 3, '要求の段階'); assert(seen.every((v, i) => !i || v >= seen[i - 1]), '段階は順に進む ' + seen);
   const { r } = pick(s, 'cabal_demand', 'accept'); assert(r.ok && !P.cabals.includes(c), '妥協で反対派は解ける'); assert(E.grudge(s, 'hiki', 'hojo') < 80);
@@ -523,7 +523,8 @@ ok('47. 同じ国の拠点への攻撃命令はすぐ攻めかかる。攻撃に
   assert(Object.keys(s.armies).filter(k => s.armies[k].faction === 'yoritomo').length < before || before === 0, '館に戻した');
 });
 ok('48. 命令のないまま留まる自軍は20日で館に戻り、再び出陣できる', () => {
-  const s = izuStart(2); const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu');
+  const s = izuStart(2); Object.values(s.bands).forEach(b => { if (b.faction === 'ito') b.strength = 0; }); Object.keys(s.armies).forEach(k => { if (s.armies[k].faction === 'ito') delete s.armies[k]; }); // 伊東勢の横槍を除く
+  const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu');
   const r0 = E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, call: false }); assert(r0.ok, r0.reason);
   const id = Object.keys(s.armies).find(k => s.armies[k].faction === 'yoritomo'); assert(id); const a = s.armies[id]; a.status = 'idle'; a.mission = 'idle'; a.target = null; a.path = []; delete s.corps[a.corps]; a.corps = null;
   for (let d = 0; d < 30 && s.armies[id]; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); }
@@ -531,7 +532,7 @@ ok('48. 命令のないまま留まる自軍は20日で館に戻り、再び出�
 });
 ok('49. 御家人への指図：承知・遅参・断りは忠誠などで決まり、承知した軍は自分の判断より指図を優先する', () => {
   let yes = 0, no = 0, kept = 0;
-  for (let seed = 1; seed <= 8; seed++) { const s = izuStart(seed); E.declareWar ? 0 : 0;
+  for (let seed = 1; seed <= 24; seed++) { const s = izuStart(seed); E.declareWar ? 0 : 0;
     ['kazusa', 'miura'].forEach(k => s.factions[k].overlord = 'yoritomo'); const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu');
     E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, call: false });
     for (const v of ['kazusa', 'miura']) { const r = E.issueCommand(s, { type: 'vassal_order', faction: 'yoritomo', vassal: v, act: 'attack', target: 'yamaki' }); assert(r.ok, r.reason); if (r.refused) no++; else yes++; }
@@ -681,11 +682,124 @@ ok('64. 出陣前に参陣の見込み（家ごとの兵の数）が分かり、
 });
 ok('65. 加勢：呼ばれていない家や近くの同盟の家が自らの意思で加わることがある。頼朝が本拠を移すと配所はただの館となり与えられる', () => {
   let vol = 0;
-  for (let seed = 1; seed <= 12 && !vol; seed++) { const s = izuStart(seed); ['kazusa', 'chiba', 'miura'].forEach(k => { s.factions[k].overlord = 'yoritomo'; E.util.rel(s, k, 'yoritomo').value = 95; });
+  for (let seed = 1; seed <= 30 && !vol; seed++) { const s = izuStart(seed); ['kazusa', 'chiba', 'miura'].forEach(k => { s.factions[k].overlord = 'yoritomo'; E.util.rel(s, k, 'yoritomo').value = 95; });
     const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu'); const r = E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, call: false });
     for (let d = 0; d < 40; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); if (s.corps[r.corps] && (s.corps[r.corps].volunteers || []).length) { vol++; break; } } }
   assert(vol > 0, '加勢が起きる');
   const t = izuStart(1); t.bases.kamakura.owner = 'yoritomo'; E.issueCommand(t, { type: 'set_capital', faction: 'yoritomo', base: 'kamakura' }); t.factions.yoritomo.money += 0; for (let d = 0; d < 3; d++) { t.pendingStops.forEach(e => e.resolved = true); E.advanceDay(t); }
   if (t.factions.yoritomo.capital === 'kamakura') { assert.strictEqual(t.bases.hirugakojima.name, '蛭ヶ小島館'); t.bases.yamaki.owner = 'x'; assert(E.issueCommand(t, { type: 'grant_base', faction: 'yoritomo', base: 'hirugakojima', to: 'adachi' }).ok, '旧配所を家に与えられる'); }
+});
+
+ok('66. 奉公：大軍の参陣でも一度に増えすぎず、忠誠の厚い家ほど毎月薄れていく（上限12）', () => {
+  const s = izuStart(3); E.addService(s, 'yoritomo', 'hojo', 40); E.serviceTick(s); assert(E.serviceOf(s, 'yoritomo', 'hojo') <= 12, '上限12');
+  s.houses.hojo.loyalty = 85; const v = E.serviceOf(s, 'yoritomo', 'hojo'); for (let i = 0; i < 3; i++) E.serviceTick(s); assert(E.serviceOf(s, 'yoritomo', 'hojo') < v * 0.5, '忠誠が厚いと薄れる');
+  s.houses.doi.loyalty = 30; E.addService(s, 'yoritomo', 'doi', 10); E.serviceTick(s); assert(E.serviceOf(s, 'yoritomo', 'doi') > 9, '忠誠が低いと残る');
+});
+ok('67. 最後の拠点が落ちると、その家は滅び一族は捕らえられる。処遇（家臣・斬首・解放・さらし首）を選べ、軍は残らない', () => {
+  const s = izuStart(4); const fid = 'ito'; const own = Object.values(s.bases).filter(b => b.owner === fid); assert(own.length >= 1);
+  own.slice(1).forEach(b => b.owner = 'heike'); const b = own[0]; b.owner = 'yoritomo';
+  const persons = Object.values(s.persons).filter(p => p.alive && p.faction === fid).map(p => p.id); assert(persons.length);
+  E.lastBaseFall(s, fid, 'yoritomo', b); assert(!s.factions[fid].alive, '滅んだ'); assert(!Object.values(s.armies).some(a => a.faction === fid), '軍は残らない');
+  assert(persons.every(id => !s.persons[id].alive || s.persons[id].captiveOf === 'yoritomo' || s.persons[id].status === '逃亡'), '一族は捕らえられる');
+  const ev = s.pendingStops.find(e => e.key === 'captives' && !e.resolved); assert(ev && ev.choices.map(c => c.id).join() === 'retain,behead,release,gokumon');
+  const L0 = E.retLoyalty(s, { kind: 'house', id: 'doi' }, 'yoritomo'); const r = E.resolveEvent(s, ev.id, 'gokumon'); assert(r.ok && /首をさらした/.test(r.message)); assert(E.retLoyalty(s, { kind: 'house', id: 'doi' }, 'yoritomo') > L0, '見せしめで忠誠が上がる');
+  const t = izuStart(4); const ob = Object.values(t.bases).filter(x => x.owner === fid); ob.slice(1).forEach(x => x.owner = 'heike'); ob[0].owner = 'yoritomo'; E.lastBaseFall(t, fid, 'yoritomo', ob[0]);
+  const ev2 = t.pendingStops.find(e => e.key === 'captives'); E.resolveEvent(t, ev2.id, 'retain'); assert(Object.values(t.persons).some(p => p.alive && p.faction === 'yoritomo' && /降人/.test(p.status)), '家臣にできる');
+});
+ok('68. 屋敷：一人に複数、当主自身も本拠以外に持てる。「○○の屋敷」として一覧に残る', () => {
+  const s = izuStart(5); s.factions.yoritomo.money = 2000; s.bases.yamaki.owner = 'yoritomo';
+  assert(E.issueCommand(s, { type: 'yashiki', faction: 'yoritomo', target: 'tokimasa', base: 'hirugakojima' }).ok); assert(E.issueCommand(s, { type: 'yashiki', faction: 'yoritomo', target: 'tokimasa', base: 'yamaki' }).ok, '二つ目');
+  assert(!E.issueCommand(s, { type: 'yashiki', faction: 'yoritomo', target: 'tokimasa', base: 'yamaki' }).ok, '同じ場所には一つ');
+  assert(E.issueCommand(s, { type: 'yashiki', faction: 'yoritomo', target: 'yoritomo', base: 'yamaki' }).ok, '当主自身の屋敷'); assert(E.issueCommand(s, { type: 'yashiki', faction: 'yoritomo', target: 'yoshitoki', base: 'yamaki' }).ok, '家の一人ひとりにも');
+  assert.strictEqual(s.yashiki.filter(y => y.person === 'tokimasa').length, 2); assert.strictEqual(E.yashikiName(s, s.yashiki[0]), '北条時政の屋敷');
+});
+ok('69. 上洛：人物が兵を率いて実際に京へ上り、着くと正統性と朝廷の好意が上がる', () => {
+  const s = izuStart(6); const lg = s.factions.yoritomo.legitimacy; Object.values(s.bands).filter(b => b.faction === 'yoritomo' && !b.house && b.province === 'izu').forEach(b => { b.strength += 200; b.base += 200; });
+  const r = E.issueCommand(s, { type: 'jokyo', faction: 'yoritomo', person: 'yoritomo', troops: 150 }); assert(r.ok, r.reason);
+  const a = Object.values(s.armies).find(x => x.jokyo); assert(a && a.commander === 'yoritomo', '当主が兵を率いて発つ');
+  for (let d = 0; d < 60 && !s.factions.yoritomo.flags.jokyo; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); }
+  assert(s.factions.yoritomo.flags.jokyo, '京に入った'); assert(s.factions.yoritomo.legitimacy > lg, '正統性が上がる'); assert.strictEqual(s.bases[s.persons.yoritomo.location].province, 'yamashiro');
+});
+ok('70. 家の一人（当主でない人）にも館を与えられ、分家として独立する', () => {
+  const s = izuStart(7); s.bases.yamaki.owner = 'yoritomo'; const r = E.issueCommand(s, { type: 'grant_base', faction: 'yoritomo', base: 'yamaki', to: 'yoshitoki', troops: 0 }); assert(r.ok, r.reason);
+  const h = s.houses.h_yoshitoki; assert(h && h.parent === 'hojo' && h.name === '北条義時家'); assert(!s.houses.hojo.members.includes('yoshitoki'), '北条氏から分かれた'); assert(E.retainersOf(s, 'yoritomo').some(x => x.id === 'h_yoshitoki'));
+});
+ok('71. 東国の諸家：安房・下野・上野・駿河などに家と拠点が置かれ、なびきやすさ・京方への傾きは隠し値として持つ', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 1, mode: 'free' });
+  ['awa_t', 'shimotsuke', 'kozuke', 'suruga', 'hitachi', 'shimosa'].forEach(p => assert(Object.values(s.bases).filter(b => b.province === p).length >= 1, p + 'に拠点'));
+  assert(Object.values(s.bases).filter(b => b.province === 'awa_t').length >= 2 && Object.values(s.bases).filter(b => b.province === 'shimotsuke').length >= 3);
+  assert.strictEqual(s.factions.anzai.capital, 'anzai_yakata'); assert(s.persons.kagemasu && s.persons.kagemasu.faction === 'anzai'); assert(s.factions.nagasa.overlord === 'heike', '長狭氏は平家方');
+  assert(s.factions.oyama.nabiki > s.factions.utsunomiya.nabiki && s.factions.utsunomiya.nabiki > s.factions.hatano.nabiki, 'なびきやすさに差');
+  assert(Object.values(s.bands).some(b => b.faction === 'oyama' && b.strength > 300)); assert(Object.values(s.holdings).some(h => h.controller === 'kodama' && h.province === 'kozuke'), '児玉党は上野にも所領');
+  const t = JSON.parse(E.saveGame ? E.saveGame(s) : JSON.stringify(s)); assert(t.factions.oyama);
+});
+ok('72. 従属の申し出：頼朝方の大軍が近くを通ると、なびきやすい家が自ら申し出てくる。受け入れると御家人になり、断ることもできる', () => {
+  const offers = {}; let accepted = 0, declined = 0;
+  for (let seed = 1; seed <= 6; seed++) { const s = E.createGame(scn, { playerFaction: 'yoritomo', seed, mode: 'free' }); s.factions.yoritomo.status = '挙兵';
+    const a = E.createArmy(s, 'yoritomo', 'shimotsuke', 1500, 'yoritomo', { food: 3000 }); a.status = 'idle'; a.mission = 'idle';
+    for (let d = 0; d < 60; d++) { s.pendingStops.forEach(e => { if (e.key !== 'submission') e.resolved = true; }); E.advanceDay(s); }
+    s.pendingStops.filter(e => e.key === 'submission' && !e.resolved).forEach((e, i) => { offers[e.faction] = (offers[e.faction] || 0) + 1;
+      const r = E.resolveEvent(s, e.id, i % 2 ? 'decline' : 'accept'); assert(r.ok);
+      if (i % 2) { declined++; assert(s.factions[e.faction].overlord !== 'yoritomo'); } else { accepted++; assert.strictEqual(s.factions[e.faction].overlord, 'yoritomo'); assert(E.retainersOf(s, 'yoritomo').some(x => x.id === e.faction)); } }); }
+  assert(offers.oyama >= 3, '小山氏はなびきやすい ' + JSON.stringify(offers)); assert(!offers.hatano && !offers.nagasa, '平家方に固い家は申し出ない'); assert(accepted > 0 && declined >= 0);
+  const s2 = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); s2.factions.yoritomo.status = '挙兵';
+  for (let d = 0; d < 30; d++) { s2.pendingStops.forEach(e => { if (e.key !== 'submission') e.resolved = true; }); E.advanceDay(s2); }
+  assert(!s2.pendingStops.some(e => e.key === 'submission' && e.faction === 'utsunomiya'), '大軍が近くにいなければ遠い家は申し出ない');
+});
+ok('73. 京方：朝廷が幕府方に追討を下すと、京方に傾く当主の家（大江親広など）は京方につく。その家がなければ何も起きない', () => {
+  let oe = 0, hojo = 0, none = 0;
+  for (let seed = 1; seed <= 10; seed++) { const s = E.createGame(scn, { playerFaction: 'yoritomo', seed, mode: 'free' }); s.factions.yoritomo.status = '幕府'; s.factions.yoritomo.flags.bakufu = true;
+    s.persons.chikahiro = { id: 'chikahiro', name: '大江親広', faction: 'yoritomo', alive: true, relations: [], courtOffices: [], warriorOffices: [], abilities: { command: 40, valor: 30, politics: 60, intellect: 60, diplomacy: 50 }, location: s.factions.yoritomo.capital };
+    s.houses.h_chikahiro = { id: 'h_chikahiro', name: '大江親広家', faction: 'yoritomo', lord: 'yoritomo', head: 'chikahiro', members: ['chikahiro'], loyalty: 70, money: 100, food: 100, rel: {} };
+    assert(E.kyogataOf(s, { kind: 'house', id: 'h_chikahiro' }) >= 80 && E.kyogataOf(s, { kind: 'house', id: 'hojo' }) === 0);
+    s.court.lastJokyu = s.day; E.issueTsuito(s, 'yoritomo', 'court');
+    if (s.factions.h_chikahiro && s.factions.h_chikahiro.overlord === 'court') oe++; if (s.houses.hojo.asFaction && s.factions.hojo.overlord !== 'yoritomo') hojo++;
+    const s0 = E.createGame(scn, { playerFaction: 'yoritomo', seed, mode: 'free' }); s0.factions.yoritomo.status = '幕府'; s0.court.lastJokyu = s0.day; E.issueTsuito(s0, 'yoritomo', 'court'); if (s0.factions.h_chikahiro) none++; }
+  assert(oe >= 5, '親広の家は京方につきやすい ' + oe); assert.strictEqual(hojo, 0, '北条氏は京方につかない'); assert.strictEqual(none, 0);
+});
+ok('74. 御家人の序列：官位・官職・役職、功績、所領の石高、兵力を点数にして並べ、石高と兵力も見られる', () => {
+  const s = bakufuWorld(3); ['oyama', 'anzai'].forEach(k => E.changeAllegiance(s, k, 'yoritomo', 'テスト'));
+  const r0 = E.gokeninRanking(s, 'yoritomo'); assert(r0.length >= 5); ['score', 'kan', 'merit', 'koku', 'troops', 'loyalty', 'rankNo'].forEach(k => assert(k in r0[0], k));
+  for (let i = 1; i < r0.length; i++) assert(r0[i - 1].score >= r0[i].score, '点数順');
+  const an = r0.find(x => x.id === 'anzai'); assert(an.koku >= 2600 && an.troops > 100);
+  s.persons.kagemasu.courtOffices = ['安房守']; E.addService(s, 'yoritomo', 'anzai', 6); const r1 = E.gokeninRanking(s, 'yoritomo'); const an1 = r1.find(x => x.id === 'anzai');
+  assert(an1.score > an.score && an1.kan > an.kan && an1.merit >= 6, '官職と功績で上がる'); E.serviceTick(s); assert(E.gokeninRanking(s, 'yoritomo').find(x => x.id === 'anzai').merit >= 6, '功績は減らない（奉公の未払いとは別）');
+});
+function coalWorld(seed) { const s = E.createGame(scn, { playerFaction: 'yoritomo', seed, mode: 'free' }); const y = s.factions.yoritomo; y.status = '挙兵'; y.money = 2000;
+  ['miura', 'chiba'].forEach(k => { s.factions[k].overlord = 'yoritomo'; }); ['yoritomo', 'miura', 'chiba'].forEach(k => { const r = E.util.rel(s, k, 'oba'); r.war = true; r.status = '交戦'; });
+  const a1 = E.createArmy(s, 'yoritomo', 'sagami', 800, 'yoritomo', { food: 3000 }), a2 = E.createArmy(s, 'miura', 'sagami', 700, 'yoshizumi', { food: 3000 }), a3 = E.createArmy(s, 'chiba', 'musashi', 600, 'tsunetane', { food: 3000 });
+  [a1, a2, a3].forEach(a => { a.status = 'idle'; E.setArmyTarget(s, a, { type: 'base', id: 'oba_mikuriya' }, 'attack'); }); return s; }
+ok('75. 連合の攻め：主君と御家人が同じ拠点を攻めると一つの合戦にまとまり、時間を止める知らせは一度だけ。落とした拠点は主君のもの', () => {
+  const s = coalWorld(3); let maxB = 0, rw = null;
+  for (let d = 0; d < 60 && !rw; d++) { s.pendingStops.forEach(e => { if (e.key === 'rewards' && !e.resolved) rw = e; else e.resolved = true; }); if (rw) break; E.advanceDay(s); maxB = Math.max(maxB, Object.values(s.battles).filter(b => b.base === 'oba_mikuriya').length); }
+  rw = rw || s.pendingStops.find(e => e.key === 'rewards' && !e.resolved);
+  assert.strictEqual(maxB, 1, '一つの合戦'); assert.strictEqual(s.eventHistory.filter(e => e.key === 'battle_start').length, 1, '開戦の停止は一度');
+  assert(rw, '論功行賞が出る'); assert.strictEqual(s.eventHistory.filter(e => e.key === 'rewards' || e.key === 'base_fall').length, 1, '勝利の知らせは一度にまとまる');
+  assert(/連合/.test(rw.title)); assert.strictEqual(s.bases.oba_mikuriya.owner, 'yoritomo', '主君の拠点になる');
+  assert(rw.merit.length >= 3 && rw.merit.some(x => x.id === 'miura') && rw.merit.some(x => x.kind === 'self')); for (let i = 1; i < rw.merit.length; i++) assert(rw.merit[i - 1].score >= rw.merit[i].score, '働きの順');
+  assert(rw.merit.every(x => x.troops > 0 && x.share >= 0)); assert(E.serviceOf(s, 'yoritomo', 'miura') > 0, '働きが奉公になる');
+});
+ok('76. 論功行賞の場で恩賞を選んで与える：拠点・屋敷・感状・銭・兵（官途は朝廷への伝手が要る）', () => {
+  const s = coalWorld(3); let rw = null;
+  for (let d = 0; d < 60 && !rw; d++) { s.pendingStops.forEach(e => { if (e.key === 'rewards' && !e.resolved) rw = e; else e.resolved = true; }); if (!rw) E.advanceDay(s); }
+  const give = (target, kind, extra) => E.issueCommand(s, Object.assign({ type: 'reward', faction: 'yoritomo', target, kind, ev: rw.id, base: rw.base }, extra || {}));
+  const m0 = s.factions.miura.money; let r = give('miura', 'money', { amount: 200 }); assert(r.ok, r.reason); assert.strictEqual(s.factions.miura.money, m0 + 200);
+  r = give('miura', 'base'); assert(r.ok, r.reason); assert(s.bases.oba_mikuriya.owner === 'miura' || s.bases.oba_mikuriya.house, '拠点を与えた');
+  r = give('chiba', 'kanjo'); assert(r.ok, r.reason); r = give('chiba', 'troops', { amount: 60 }); assert(r.ok, r.reason);
+  r = give('chiba', 'yashiki', { base: 'oba_mikuriya' }); assert(r.ok, r.reason);
+  assert(!give('chiba', 'money', { amount: 999999 }).ok, '銭が足りなければ与えられない'); assert(!give('chiba', 'shugo', { province: 'sagami' }).ok, '守護は幕府を開いてから');
+  assert(rw.given.miura.length === 2 && rw.given.chiba.length === 3, '与えたものが記録される');
+  const rr = E.resolveEvent(s, rw.id, 'done'); assert(rr.ok && /論功行賞を終えた/.test(rr.message));
+});
+ok('77. 敵軍の迎撃：地図の敵軍に自軍・御家人（連合）を差し向けると追いかけて合戦になる。滅んだ家の兵は散る', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 5, mode: 'free' }); s.factions.yoritomo.status = '挙兵'; s.factions.miura.overlord = 'yoritomo'; E.util.rel(s, 'miura', 'yoritomo').value = 90;
+  ['yoritomo', 'miura'].forEach(k => { const r = E.util.rel(s, k, 'oba'); r.war = true; r.status = '交戦'; });
+  const en = E.createArmy(s, 'oba', 'izu', 300, 'kagechika', { food: 3000 }); en.status = 'idle'; E.setArmyTarget(s, en, { type: 'province', id: 'suruga' }, 'move');
+  const a1 = E.createArmy(s, 'yoritomo', 'sagami', 700, 'yoritomo', { food: 3000 }); a1.status = 'idle';
+  assert(!E.issueCommand(s, { type: 'intercept', faction: 'yoritomo', enemy: en.id, armies: [], vassals: [] }).ok, '差し向ける軍が要る');
+  const r = E.issueCommand(s, { type: 'intercept', faction: 'yoritomo', enemy: en.id, armies: [a1.id], vassals: ['miura'] }); assert(r.ok, r.reason); assert.strictEqual(a1.chase, en.id);
+  let fought = false; for (let d = 0; d < 40; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); if (Object.values(s.battles).some(b => b.sides.att.concat(b.sides.def).includes(en.id))) fought = true; }
+  assert(fought, '追いついて合戦になる');
+  const s2 = E.createGame(scn, { playerFaction: 'yoritomo', seed: 5, mode: 'free' }); const st = E.createArmy(s2, 'ito', 'izu', 200, 'sukechika', { food: 999 }); s2.factions.ito.alive = false; E.chaseTick(s2); assert(!s2.armies[st.id], '滅んだ家の兵は散る');
 });
 console.log(`\n${n} 件の受入条件をすべて満たした`);
