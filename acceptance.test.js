@@ -684,7 +684,8 @@ ok('65. 加勢：呼ばれていない家や近くの同盟の家が自らの意
   let vol = 0;
   for (let seed = 1; seed <= 30 && !vol; seed++) { const s = izuStart(seed); ['kazusa', 'chiba', 'miura'].forEach(k => { s.factions[k].overlord = 'yoritomo'; E.util.rel(s, k, 'yoritomo').value = 95; });
     const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu'); const r = E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, call: false });
-    for (let d = 0; d < 40; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); if (s.corps[r.corps] && (s.corps[r.corps].volunteers || []).length) { vol++; break; } } }
+    for (let d = 0; d < 3; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); }
+    for (let k = 0; k < 80 && s.corps[r.corps]; k++) { s.day += 5 - (s.day % 5); E.volunteerTick(s); if ((s.corps[r.corps].volunteers || []).length) { vol++; break; } } } // 5日ごとの判断を繰り返し確かめる
   assert(vol > 0, '加勢が起きる');
   const t = izuStart(1); t.bases.kamakura.owner = 'yoritomo'; E.issueCommand(t, { type: 'set_capital', faction: 'yoritomo', base: 'kamakura' }); t.factions.yoritomo.money += 0; for (let d = 0; d < 3; d++) { t.pendingStops.forEach(e => e.resolved = true); E.advanceDay(t); }
   if (t.factions.yoritomo.capital === 'kamakura') { assert.strictEqual(t.bases.hirugakojima.name, '蛭ヶ小島館'); t.bases.yamaki.owner = 'x'; assert(E.issueCommand(t, { type: 'grant_base', faction: 'yoritomo', base: 'hirugakojima', to: 'adachi' }).ok, '旧配所を家に与えられる'); }
@@ -737,10 +738,10 @@ ok('72. 従属の申し出：頼朝方の大軍が近くを通ると、なびき
   const offers = {}; let accepted = 0, declined = 0;
   for (let seed = 1; seed <= 6; seed++) { const s = E.createGame(scn, { playerFaction: 'yoritomo', seed, mode: 'free' }); s.factions.yoritomo.status = '挙兵';
     const a = E.createArmy(s, 'yoritomo', 'shimotsuke', 1500, 'yoritomo', { food: 3000 }); a.status = 'idle'; a.mission = 'idle';
-    for (let d = 0; d < 60; d++) { s.pendingStops.forEach(e => { if (e.key !== 'submission') e.resolved = true; }); E.advanceDay(s); }
-    s.pendingStops.filter(e => e.key === 'submission' && !e.resolved).forEach((e, i) => { offers[e.faction] = (offers[e.faction] || 0) + 1;
-      const r = E.resolveEvent(s, e.id, i % 2 ? 'decline' : 'accept'); assert(r.ok);
-      if (i % 2) { declined++; assert(s.factions[e.faction].overlord !== 'yoritomo'); } else { accepted++; assert.strictEqual(s.factions[e.faction].overlord, 'yoritomo'); assert(E.retainersOf(s, 'yoritomo').some(x => x.id === e.faction)); } }); }
+    let i = 0;
+    for (let d = 0; d < 60; d++) { s.pendingStops.forEach(e => { if (e.resolved) return; if (e.key !== 'submission') { e.resolved = true; return; }
+      offers[e.faction] = (offers[e.faction] || 0) + 1; const r = E.resolveEvent(s, e.id, i % 2 ? 'decline' : 'accept'); assert(r.ok);
+      if (i % 2) { declined++; assert(s.factions[e.faction].overlord !== 'yoritomo'); } else { accepted++; assert.strictEqual(s.factions[e.faction].overlord, 'yoritomo'); assert(E.retainersOf(s, 'yoritomo').some(x => x.id === e.faction)); } i++; }); E.advanceDay(s); } }
   assert(offers.oyama >= 3, '小山氏はなびきやすい ' + JSON.stringify(offers)); assert(!offers.hatano && !offers.nagasa, '平家方に固い家は申し出ない'); assert(accepted > 0 && declined >= 0);
   const s2 = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); s2.factions.yoritomo.status = '挙兵';
   for (let d = 0; d < 30; d++) { s2.pendingStops.forEach(e => { if (e.key !== 'submission') e.resolved = true; }); E.advanceDay(s2); }
@@ -768,15 +769,16 @@ ok('74. 御家人の序列：官位・官職・役職、功績、所領の石高
 function coalWorld(seed) { const s = E.createGame(scn, { playerFaction: 'yoritomo', seed, mode: 'free' }); const y = s.factions.yoritomo; y.status = '挙兵'; y.money = 2000;
   ['miura', 'chiba'].forEach(k => { s.factions[k].overlord = 'yoritomo'; }); ['yoritomo', 'miura', 'chiba'].forEach(k => { const r = E.util.rel(s, k, 'oba'); r.war = true; r.status = '交戦'; });
   const a1 = E.createArmy(s, 'yoritomo', 'sagami', 800, 'yoritomo', { food: 3000 }), a2 = E.createArmy(s, 'miura', 'sagami', 700, 'yoshizumi', { food: 3000 }), a3 = E.createArmy(s, 'chiba', 'musashi', 600, 'tsunetane', { food: 3000 });
-  [a1, a2, a3].forEach(a => { a.status = 'idle'; E.setArmyTarget(s, a, { type: 'base', id: 'oba_mikuriya' }, 'attack'); }); return s; }
+  [a1, a2, a3].forEach(a => { a.status = 'idle'; E.setArmyTarget(s, a, { type: 'base', id: 'oba_mikuriya' }, 'attack'); });
+  a2.lordOrder = { lord: 'yoritomo', act: 'attack', target: { type: 'base', id: 'oba_mikuriya' }, until: s.day + 120 }; return s; } // 三浦は指図で、千葉は自分の判断で攻める
 ok('75. 連合の攻め：主君と御家人が同じ拠点を攻めると一つの合戦にまとまり、時間を止める知らせは一度だけ。落とした拠点は主君のもの', () => {
   const s = coalWorld(3); let maxB = 0, rw = null;
   for (let d = 0; d < 60 && !rw; d++) { s.pendingStops.forEach(e => { if (e.key === 'rewards' && !e.resolved) rw = e; else e.resolved = true; }); if (rw) break; E.advanceDay(s); maxB = Math.max(maxB, Object.values(s.battles).filter(b => b.base === 'oba_mikuriya').length); }
   rw = rw || s.pendingStops.find(e => e.key === 'rewards' && !e.resolved);
-  assert.strictEqual(maxB, 1, '一つの合戦'); assert.strictEqual(s.eventHistory.filter(e => e.key === 'battle_start').length, 1, '開戦の停止は一度');
+  assert.strictEqual(maxB, 1, '一つの合戦'); assert.strictEqual(s.eventHistory.filter(e => e.key === 'battle_start').length, 0, '開戦では止めない（知らせのみ）');
   assert(rw, '論功行賞が出る'); assert.strictEqual(s.eventHistory.filter(e => e.key === 'rewards' || e.key === 'base_fall').length, 1, '勝利の知らせは一度にまとまる');
   assert(/連合/.test(rw.title)); assert.strictEqual(s.bases.oba_mikuriya.owner, 'yoritomo', '主君の拠点になる');
-  assert(rw.merit.length >= 3 && rw.merit.some(x => x.id === 'miura') && rw.merit.some(x => x.kind === 'self')); for (let i = 1; i < rw.merit.length; i++) assert(rw.merit[i - 1].score >= rw.merit[i].score, '働きの順');
+  assert(rw.merit.length >= 2 && rw.merit.some(x => x.id === 'miura') && rw.merit.some(x => x.kind === 'self')); assert(!rw.merit.some(x => x.id === 'chiba'), '指示なしに戦った家は恩賞を求めない'); for (let i = 1; i < rw.merit.length; i++) assert(rw.merit[i - 1].score >= rw.merit[i].score, '働きの順');
   assert(rw.merit.every(x => x.troops > 0 && x.share >= 0)); assert(E.serviceOf(s, 'yoritomo', 'miura') > 0, '働きが奉公になる');
 });
 ok('76. 論功行賞の場で恩賞を選んで与える：拠点・屋敷・感状・銭・兵（官途は朝廷への伝手が要る）', () => {
@@ -785,10 +787,11 @@ ok('76. 論功行賞の場で恩賞を選んで与える：拠点・屋敷・感
   const give = (target, kind, extra) => E.issueCommand(s, Object.assign({ type: 'reward', faction: 'yoritomo', target, kind, ev: rw.id, base: rw.base }, extra || {}));
   const m0 = s.factions.miura.money; let r = give('miura', 'money', { amount: 200 }); assert(r.ok, r.reason); assert.strictEqual(s.factions.miura.money, m0 + 200);
   r = give('miura', 'base'); assert(r.ok, r.reason); assert(s.bases.oba_mikuriya.owner === 'miura' || s.bases.oba_mikuriya.house, '拠点を与えた');
-  r = give('chiba', 'kanjo'); assert(r.ok, r.reason); r = give('chiba', 'troops', { amount: 60 }); assert(r.ok, r.reason);
+  E.addService(s, 'yoritomo', 'miura', 6); r = give('miura', 'kanjo'); assert(r.ok, r.reason); r = give('miura', 'kanjo'); assert(r.ok, '感状は何度でも（奉公が残っていれば）'); while (E.serviceOf(s, 'yoritomo', 'miura') >= 1) give('miura', 'kanjo'); assert(!give('miura', 'kanjo').ok, '奉公がなければ感状は出せない');
+  r = give('chiba', 'troops', { amount: 60 }); assert(r.ok, r.reason);
   r = give('chiba', 'yashiki', { base: 'oba_mikuriya' }); assert(r.ok, r.reason);
   assert(!give('chiba', 'money', { amount: 999999 }).ok, '銭が足りなければ与えられない'); assert(!give('chiba', 'shugo', { province: 'sagami' }).ok, '守護は幕府を開いてから');
-  assert(rw.given.miura.length === 2 && rw.given.chiba.length === 3, '与えたものが記録される');
+  assert(rw.given.miura.length >= 4 && rw.given.chiba.length === 2, '与えたものが記録される');
   const rr = E.resolveEvent(s, rw.id, 'done'); assert(rr.ok && /論功行賞を終えた/.test(rr.message));
 });
 ok('77. 敵軍の迎撃：地図の敵軍に自軍・御家人（連合）を差し向けると追いかけて合戦になる。滅んだ家の兵は散る', () => {
@@ -801,5 +804,32 @@ ok('77. 敵軍の迎撃：地図の敵軍に自軍・御家人（連合）を差
   let fought = false; for (let d = 0; d < 40; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); if (Object.values(s.battles).some(b => b.sides.att.concat(b.sides.def).includes(en.id))) fought = true; }
   assert(fought, '追いついて合戦になる');
   const s2 = E.createGame(scn, { playerFaction: 'yoritomo', seed: 5, mode: 'free' }); const st = E.createArmy(s2, 'ito', 'izu', 200, 'sukechika', { food: 999 }); s2.factions.ito.alive = false; E.chaseTick(s2); assert(!s2.armies[st.id], '滅んだ家の兵は散る');
+});
+ok('78. 関東以外の家：甲斐・信濃・北陸・近江・畿内・九州・陸奥に家と拠点を置く。義仲に付きたい家は義仲には付き、平家方の九州の家は平家の家人', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 1, mode: 'free' }); const cnt = p => Object.values(s.bases).filter(b => b.province === p).length;
+  assert(cnt('chikuzen') >= 6 && cnt('buzen') >= 4 && cnt('etchu') >= 2 && cnt('shinano') >= 8 && cnt('kai') >= 4, '西国・北陸・甲信の拠点が増えた');
+  assert.strictEqual(s.persons.yoshisada.faction, 'yasuda'); assert.strictEqual(s.factions.yasuda.overlord, 'kai'); assert.strictEqual(s.factions.yamaga.overlord, 'heike'); assert(s.factions.yamaga.navy);
+  assert.strictEqual(s.factions.ishiguro.prefer, 'kiso'); assert(!s.factions.ishiguro.overlord); assert(/不詳/.test(s.persons.matsura_soryo.name), '名の分からない当主は創作しない');
+  const old = E.createGame(scn, { playerFaction: 'yoritomo', seed: 1, mode: 'free' }); delete old.factions.yamaga; delete old.bases.yamaga_jo; old.flags.clans = 1; const t = E.load(E.save(old)); assert(t.factions.yamaga && t.flags.clans === 2, '旧いセーブにも追加される');
+});
+ok('79. 守り：籠城は防御に応じて数日持ちこたえ、自分の拠点が攻められたら知らせて援軍を出せる。出陣中の軍を見張りに置け、攻められれば守りに加わる', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 4, mode: 'free' }); s.factions.yoritomo.status = '挙兵'; const r0 = E.util.rel(s, 'yoritomo', 'ito'); r0.war = true; r0.status = '交戦';
+  const g = E.createArmy(s, 'yoritomo', 'sagami', 300, 'sanehira', { food: 999 }); g.status = 'idle';
+  assert(E.issueCommand(s, { type: 'station', faction: 'yoritomo', army: g.id, base: 'hojo' }).ok);
+  for (let d = 0; d < 8; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); } assert(s.armies[g.id] && s.armies[g.id].province === 'izu' && s.armies[g.id].mission === 'guard', '見張りは留まる');
+  for (let d = 0; d < 25; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); } assert(s.armies[g.id], '見張りは20日たっても館に戻らない');
+  const en = E.createArmy(s, 'ito', 'izu', 900, 'sukechika', { food: 999 }); en.status = 'idle'; E.setArmyTarget(s, en, { type: 'base', id: 'hojo' }, 'attack');
+  let ev = null, bt = null; for (let d = 0; d < 3 && !ev; d++) { E.advanceDay(s); ev = s.pendingStops.find(e => e.key === 'base_attacked' && !e.resolved); }
+  assert(ev && ev.choices.some(c => c.id === 'relief'), '拠点が攻められた知らせ'); bt = Object.values(s.battles).find(b => b.base === 'hojo'); assert(bt && bt.sides.def.includes(g.id), '見張りが守りに加わる');
+  const rr = E.resolveEvent(s, ev.id, 'relief'); assert(rr.relief && rr.relief.id === 'hojo');
+  const minD = E.siegeMinDays(s.bases.hojo); let held = 0; for (let d = 0; d < minD - 1; d++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); if (s.bases.hojo.owner === 'yoritomo') held++; } assert.strictEqual(held, minD - 1, '数日は落ちない');
+  const g2 = E.createArmy(s, 'yoritomo', 'sagami', 200, null, { food: 99 }); g2.status = 'idle'; const gar = s.bases.kamakura ? 0 : 0;
+  s.bases.doi.owner = 'yoritomo'; const before = s.bases.doi.garrison; assert(E.issueCommand(s, { type: 'station', faction: 'yoritomo', army: g2.id, base: 'doi', merge: true }).ok); assert(s.bases.doi.garrison === before + 200 && !s.armies[g2.id], '守備兵に加える');
+});
+ok('80. 館を与える相手：御家人（勢力）の家の人（当主以外）にも与えられ、主君に直に仕える分家になる', () => {
+  const s = bakufuWorld(6); s.bases.yamaki.owner = 'yoritomo'; const m = Object.values(s.persons).find(p => p.alive && p.faction === 'miura' && p.id !== s.factions.miura.leader); assert(m, '三浦の一族');
+  const r = E.issueCommand(s, { type: 'grant_base', faction: 'yoritomo', base: 'yamaki', to: m.id, troops: 0 }); assert(r.ok, r.reason);
+  const h = s.houses['h_' + m.id]; assert(h && h.lord === 'yoritomo' && h.parent === 'miura' && /三浦/.test(h.note)); assert.strictEqual(m.faction, 'yoritomo');
+  assert(E.retainersOf(s, 'yoritomo').some(x => x.id === h.id));
 });
 console.log(`\n${n} 件の受入条件をすべて満たした`);
