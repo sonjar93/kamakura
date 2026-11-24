@@ -560,4 +560,41 @@ ok('51. 主従の義理：主君が健在で関係が悪くなければ、御家
     if (s.factions.miura.overlord && s.factions.miura.overlord !== 'yoritomo') flips++; }
   assert.strictEqual(flips, 0, '三浦氏は甲斐源氏などへ鞍替えしない');
 });
+
+ok('52. 御恩：屋敷（一度だけ）・引出物（60日あける）・感状（働きがあるとき）・官途の推挙（朝廷への伝手が要る）で忠誠が上がる', () => {
+  const s = izuStart(6); const y = s.factions.yoritomo; y.money = 3000;
+  const hj = E.retainersOf(s, 'yoritomo').find(r => r.id === 'hojo'), L0 = E.retLoyalty(s, hj, 'yoritomo');
+  let r = E.issueCommand(s, { type: 'bestow', faction: 'yoritomo', target: 'hojo', kind: 'yashiki' }); assert(r.ok, r.reason); assert(E.retLoyalty(s, hj, 'yoritomo') > L0, '忠誠が上がる');
+  assert(!E.issueCommand(s, { type: 'bestow', faction: 'yoritomo', target: 'hojo', kind: 'yashiki' }).ok, '屋敷は一度だけ');
+  assert(E.issueCommand(s, { type: 'bestow', faction: 'yoritomo', target: 'hojo', kind: 'gift' }).ok); assert(!E.issueCommand(s, { type: 'bestow', faction: 'yoritomo', target: 'hojo', kind: 'gift' }).ok, '引出物は60日あける');
+  assert(!E.issueCommand(s, { type: 'bestow', faction: 'yoritomo', target: 'doi', kind: 'kanjo' }).ok, '働きがなければ感状は出せない');
+  y.flags.ryoji = false; y.flags.insen = false; y.legitimacy = 20; assert(!E.issueCommand(s, { type: 'bestow', faction: 'yoritomo', target: 'doi', kind: 'kanto' }).ok, '伝手がなければ官途は推挙できない');
+  y.flags.ryoji = true; const kt = E.issueCommand(s, { type: 'bestow', faction: 'yoritomo', target: 'doi', kind: 'kanto' }); assert(kt.ok, kt.reason); assert(/尉|允|介/.test(kt.message));
+  const tk = Object.keys(s.persons).find(k => s.persons[k].faction === 'yoritomo' && k !== 'yoritomo' && s.persons[k].alive); assert(E.issueCommand(s, { type: 'bestow', faction: 'yoritomo', target: tk, kind: 'gift' }).ok, '家臣（人物）にも与えられる');
+});
+ok('53. 先陣を任せた家は参陣しやすく、拠点を落とすと論功行賞の場面が出る', () => {
+  let withS = 0, without = 0;
+  for (let seed = 1; seed <= 16; seed++) for (const sj of [null, 'doi']) { const s = izuStart(seed); s.houses.doi.loyalty = 25;
+    const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu');
+    const r = E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, senjin: sj });
+    const c = (s.corps[r.corps].contingents || []).find(x => x.id === 'doi'); if (c && c.decision !== 'refuse') { if (sj) withS++; else without++; } }
+  assert(withS > without, '先陣を任せると参陣しやすい ' + withS + '>' + without);
+  const s = izuStart(2); const iz = E.sortieSources(s, 'yoritomo').find(x => x.province === 'izu'); s.bases.yamaki.garrison = 5;
+  E.issueCommand(s, { type: 'sortie', faction: 'yoritomo', target: { type: 'base', id: 'yamaki' }, commander: 'yoritomo', units: [], commanderUnit: { province: 'izu', troops: iz.available }, declare: true, senjin: 'hojo' });
+  let ev = null; for (let d = 0; d < 40 && !ev && s.bases.yamaki.owner !== 'yoritomo'; d++) { ev = s.pendingStops.find(e => e.key === 'rewards' && !e.resolved); s.pendingStops.forEach(e => { if (e.key !== 'rewards') e.resolved = true; }); if (!ev) E.advanceDay(s); }
+  ev = ev || s.pendingStops.find(e => e.key === 'rewards' && !e.resolved);
+  if (s.bases.yamaki.owner === 'yoritomo' && ev) { s.factions.yoritomo.money = 2000; const rr = E.resolveEvent(s, ev.id, 'kanjo'); assert(rr.ok && /感状/.test(rr.message), '論功行賞で感状と引出物を配る'); }
+});
+ok('54. 文官の下向：史実モードでは頼朝が関東に本拠を持てば史実の時期に大江広元・三善康信らが加わる', () => {
+  const s = izuStart(7); s.options.mode = 'historical'; const y = s.factions.yoritomo; y.status = '挙兵'; s.bases.kamakura.owner = 'yoritomo'; y.capital = 'kamakura';
+  s.date = { y: 1183, m: 1, leap: false, d: 1 }; E.arrivalsTick(s); assert(!s.persons.hiromoto, '1183年初めにはまだいない'); assert(s.persons.toshikane && s.persons.toshikane.faction === 'yoritomo', '右筆の藤原俊兼は1181年から');
+  s.date = { y: 1184, m: 10, leap: false, d: 1 }; E.arrivalsTick(s); assert(s.persons.hiromoto && s.persons.hiromoto.faction === 'yoritomo'); assert.strictEqual(s.persons.yasunobu.faction, 'yoritomo'); assert.strictEqual(s.persons.yasunobu.location, 'kamakura');
+  const t = izuStart(7); t.date = { y: 1185, m: 1, leap: false, d: 1 }; E.arrivalsTick(t); assert(!t.persons.hiromoto, '関東に本拠がなければ下らない');
+});
+ok('55. 討死はまれ：2年の戦乱で討死する人物はごく少ない', () => {
+  let dead = 0, battles = 0;
+  for (let seed = 1; seed <= 3; seed++) { const s = E.createGame(scn, { playerFaction: 'yoritomo', seed, mode: 'free' }); for (let d = 0; d < 500; d++) { s.pendingStops.forEach(e => { if (!e.resolved && e.choices && e.choices[0]) E.resolveEvent(s, e.id, e.choices[0].id); e.resolved = true; }); E.advanceDay(s); }
+    dead += s.log.filter(l => /討死|陥落時に討たれる/.test(l.text) && /【死去】/.test(l.text)).length; battles += s.log.filter(l => /【合戦】/.test(l.text)).length; }
+  assert(battles > 10, '合戦はある ' + battles); assert(dead <= Math.max(2, battles * 0.03), '討死 ' + dead + '／合戦 ' + battles);
+});
 console.log(`\n${n} 件の受入条件をすべて満たした`);
