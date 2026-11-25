@@ -927,5 +927,8 @@ ok('94. 拠点のない国：敵の拠点も軍もない国に大軍がとどま
   const s2 = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); const r2 = E.util.rel(s2, 'yoritomo', 'heike'); r2.war = true; s2.factions.heike.flags.choteki = true;
   const b = E.createArmy(s2, 'yoritomo', 'owari', 2000, 'yoritomo', { food: 999 }); b.status = 'idle'; const e = E.createArmy(s2, 'heike', 'owari', 500, null, { food: 999 }); e.status = 'idle';
   for (let d = 0; d < 8; d++) { E.seizeTick(s2); s2.day++; } assert(Object.values(s2.holdings).some(h => h.province === 'owari' && h.controller === 'heike'), '敵軍がいれば押さえられない');
+  const s3 = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); const r3 = E.util.rel(s3, 'yoritomo', 'heike'); r3.war = true; s3.bases.rokuhara.owner = 'yoritomo'; s3.bases.sanjo_takakura.owner = 'yoritomo';
+  assert.strictEqual(E.capitalCamp(s3), 'yoritomo', '六波羅を落とせば都を押さえたことになる'); const c3 = E.createArmy(s3, 'yoritomo', 'mikawa', 2000, 'yoritomo', { food: 999 }); c3.status = 'idle';
+  for (let d = 0; d < 4; d++) { E.seizeTick(s3); s3.day++; } assert(Object.values(s3.holdings).some(h => h.province === 'mikawa' && h.type === '国衙領' && h.controller === 'yoritomo'), '都を押さえていれば国衙領も押さえる');
 });
 console.log(`\n${n} 件の受入条件をすべて満たした`);

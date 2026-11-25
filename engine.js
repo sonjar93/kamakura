@@ -17,7 +17,7 @@
   else root.GenpeiEngine = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var ENGINE_VERSION = '0.32.0';
+  var ENGINE_VERSION = '0.32.2';
 
   // ================================================================ 乱数（シード固定・状態に保存）
   function rand(s) {
@@ -1549,7 +1549,12 @@
     news(s, '【赦免】朝廷は' + f.name + 'を赦し、朝敵の汚名を解いた（' + why + '）', { type: 'court', important: true, factions: [fid] });
     if (involvesPlayer(s, fid)) stop(s, { key: 'pardon', title: '朝敵の赦免', text: f.name + 'は朝敵を解かれた（' + why + '）。任官・国司の申請ができるようになり、大義も回復した。', choices: [] });
   }
-  function capitalHeld(s, fid) { var cb = B(s, s.court && s.court.location); return !!(cb && cb.owner && topLord(s, cb.owner) === topLord(s, fid)); }
+  function capitalCamp(s) { // 都の国（山城）の武家の拠点をすべて押さえている陣営（朝廷・寺社の拠点は数えない）
+    var cb = B(s, s.court && s.court.location); if (!cb) return null; if (cb.owner && cb.owner !== 'court' && F(s, cb.owner) && F(s, cb.owner).type.indexOf('寺社') < 0) return topLord(s, cb.owner);
+    var camps = {}; Object.keys(s.bases).forEach(function (k) { var b = s.bases[k]; if (b.province !== cb.province || !b.owner || b.owner === 'court') return; var f = F(s, b.owner); if (!f || !f.alive || f.type.indexOf('寺社') >= 0) return; camps[topLord(s, b.owner)] = 1; }); // 武家が籠もる御所も数える
+    var ks = Object.keys(camps); return ks.length === 1 ? ks[0] : null;
+  }
+  function capitalHeld(s, fid) { var c = capitalCamp(s); return !!c && c === topLord(s, fid); }
   function pardonOdds(s, fid) {
     var f = F(s, fid), by = F(s, f.chotekiBy), byGone = f.chotekiBy !== 'court' && f.chotekiBy != null && (!by || !by.alive || (s.court.controller !== f.chotekiBy && topLord(s, s.court.controller) !== f.chotekiBy));
     var yrs = (s.day - (f.chotekiSince || s.day)) / 360, ctrl = s.court.controller;
@@ -3921,12 +3926,13 @@
   function courtPolitics(s) {
     ensureCourt(s); var c = s.court, cl = c.cliques, ctrl = c.controller = courtController(s), cf = F(s, ctrl), capB = B(s, c.location);
     // 0) 都の武力：山城を実際に押さえる陣営へ朝廷の主導権が移っていく
-    var cap = capB ? capB.province : 'yamashiro', inf = provinceInfluence(s, cap)[0], holder = inf ? topLord(s, inf.faction) : null;
+    var cap = capB ? capB.province : 'yamashiro', inf = provinceInfluence(s, cap)[0], holder = capitalCamp(s) || (inf ? topLord(s, inf.faction) : null); // 都の武家の拠点を押さえた陣営が先
     if (holder && holder !== 'court' && F(s, holder) && F(s, holder).type !== '寺社') {
       Object.keys(c.dominance).forEach(function (k) { if (k !== holder) c.dominance[k] = Math.max(0, c.dominance[k] - ((c.dominance[holder] || 0) > 50 ? 6 : 3)); });
       c.dominance[holder] = Math.min(100, (c.dominance[holder] || 0) + 6);
       if (holder !== ctrl && (c.dominance[holder] || 0) > (c.dominance[ctrl] || 0)) { var prev = ctrl; ctrl = c.controller = holder; cf = F(s, ctrl);
-        news(s, '【朝廷】都を押さえた' + cf.name + 'が朝廷の主導権を握った（' + fname(s, prev) + 'に代わって）', { type: 'court', important: true, factions: [holder, prev] }); aiLog(s, 'court', cf.name + 'が朝廷を主導', '山城の実効支配'); }
+        news(s, '【朝廷】都を押さえた' + cf.name + 'が朝廷の主導権を握った（' + fname(s, prev) + 'に代わって）', { type: 'court', important: true, factions: [holder, prev] }); aiLog(s, 'court', cf.name + 'が朝廷を主導', '山城の実効支配');
+        var pf0 = F(s, prev); if (pf0 && pf0.alive && prev !== 'court' && atWar(s, prev, holder) && !pf0.flags.choteki && !(pf0.pardonDay != null && s.day - pf0.pardonDay < 360)) issueTsuito(s, prev, holder); } // 都を追われた側は朝敵とされる
     }
     // 1) 影響力の変動：都を握る武家と結ぶ派閥が伸び、対立する派閥が細る
     Object.keys(cl).forEach(function (k) { var x = cl[k], a = cliqueAtt(s, x, ctrl);
@@ -5210,7 +5216,7 @@
     createGame: createGame, advanceDay: advanceDay, runDays: runDays, runUntilMonthEnd: runUntilMonthEnd,
     issueCommand: issueCommand, BUILD: BUILD, buildRights: buildRights, INSTITUTIONS: INSTITUTIONS, bakufuCheck: bakufuCheck,
     createArmy: createArmy, changeAllegiance: changeAllegiance, issueTsuito: issueTsuito, resolveSubmission: resolveSubmission,
-    seizeTick: seizeTick, pardon: pardon, pardonOdds: pardonOdds, pardonTick: pardonTick, petitionPardon: petitionPardon, capitalHeld: capitalHeld,
+    capitalCamp: capitalCamp, seizeTick: seizeTick, pardon: pardon, pardonOdds: pardonOdds, pardonTick: pardonTick, petitionPardon: petitionPardon, capitalHeld: capitalHeld,
     sellFood: sellFood, levyTansen: levyTansen, returnHome: returnHome, rootOf: rootOf, branchHeads: branchHeads, houseBuildTick: houseBuildTick, mergeBranch: mergeBranch,
     templePermit: templePermit, kaikon: kaikon, setDelegate: setDelegate, DELEGATE: DELEGATE, delegateTick: delegateTick, officeTick: officeTick, mergeTick: mergeTick, groupLabel: groupLabel, fireCheck: fireCheck, fireTick: fireTick, repairBase: repairBase, kaikonTick: kaikonTick, templeTick: templeTick,
     volunteerTick: volunteerTick, stationArmy: stationArmy, siegeMinDays: siegeMinDays, setArmyTarget: setArmyTarget, battleMerit: battleMerit, giveReward: giveReward, intercept: intercept, chaseTick: chaseTick, REWARD_KINDS: REWARD_KINDS,
