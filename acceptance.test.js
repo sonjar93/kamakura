@@ -832,4 +832,49 @@ ok('80. 館を与える相手：御家人（勢力）の家の人（当主以外
   const h = s.houses['h_' + m.id]; assert(h && h.lord === 'yoritomo' && h.parent === 'miura' && /三浦/.test(h.note)); assert.strictEqual(m.faction, 'yoritomo');
   assert(E.retainersOf(s, 'yoritomo').some(x => x.id === h.id));
 });
+ok('81. 寺社の建立：朝廷の許し（勅許）がなければ建てられず、許しを得ると一つ建てられる。完成した寺社は毎月大義を上げる', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); const f = s.factions.yoritomo; f.money = 5000; f.food = 5000;
+  let r = E.issueCommand(s, { type: 'build', province: 'izu', scale: 'temple', name: '願成就院', x: 1030, y: 800 }); assert(!r.ok && /勅許/.test(r.reason));
+  let got = false; for (let i = 0; i < 20 && !got; i++) { f.permitTry = null; const q = E.issueCommand(s, { type: 'temple_permit' }); assert(q.ok); got = f.templePermits > 0; } assert(got, '何度か願えば許しが出る');
+  r = E.issueCommand(s, { type: 'build', province: 'izu', scale: 'temple', name: '願成就院', x: 1030, y: 800 }); assert(r.ok, r.reason); assert.strictEqual(f.templePermits, 0);
+  const c = s.constructions[r.id]; c.progress = c.required; E.advanceDay(s); const b = Object.values(s.bases).find(x => x.name === '願成就院'); assert(b && b.type === '寺社' && b.owner === 'yoritomo');
+  const lg = f.legitimacy; E.templeTick(s); assert(f.legitimacy > lg);
+});
+ok('82. 開墾：所領のある国で開墾すると、日数ののち新しい私領ができ、集められる兵の上限が増える', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); const f = s.factions.yoritomo; f.money = 3000; f.food = 3000;
+  const cap0 = E.recruitInfo ? E.recruitInfo(s, 'yoritomo', 'izu').cap : null; assert(!E.issueCommand(s, { type: 'kaikon', province: 'mutsu' }).ok, '所領のない国はだめ');
+  const r = E.issueCommand(s, { type: 'kaikon', province: 'izu' }); assert(r.ok, r.reason); const x = s.kaikon[0]; x.progress = x.need; E.kaikonTick(s);
+  assert(Object.values(s.holdings).some(h => /新田/.test(h.name) && h.controller === 'yoritomo' && h.province === 'izu')); if (cap0 != null) assert(E.recruitInfo(s, 'yoritomo', 'izu').cap > cap0, '兵の上限が増える');
+});
+ok('83. 委任：徴兵・恩賞・論功行賞などを任せると、裏で自動で行う', () => {
+  const s = coalWorld(3); s.factions.yoritomo.money = 3000; assert(E.issueCommand(s, { type: 'delegate', key: 'ronko', on: true }).ok); E.issueCommand(s, { type: 'delegate', key: 'rewards', on: true }); E.issueCommand(s, { type: 'delegate', key: 'recruit', on: true, keep: 300 });
+  for (let d = 0; d < 60; d++) { s.pendingStops.forEach(e => { if (e.key !== 'rewards') e.resolved = true; }); E.advanceDay(s); }
+  assert(!s.pendingStops.some(e => e.key === 'rewards' && !e.resolved), '論功行賞は委任で片づく'); assert(s.eventHistory.some(e => e.key === 'rewards'));
+  assert(s.log.some(l => /【委任】/.test(l.text)), '委任の知らせ');
+});
+ok('84. 役職の自立：侍所・政所・問注所の長は権限を自ら使う。忠誠の高い者は伺いを立て、許すか退けるか選べる', () => {
+  const s = bakufuWorld(3); const f = s.factions.yoritomo; f.money = 2000; f.institutions = { samurai_dokoro: { head: 'yoshimori' }, kumonjo: { head: 'hiromoto' in s.persons ? 'hiromoto' : 'tokimasa' } };
+  E.addService(s, 'yoritomo', 'miura', 6); let asked = 0, acted = 0;
+  for (let i = 0; i < 40; i++) { E.officeTick(s); s.pendingStops.forEach(e => { if (e.key === 'office_request' && !e.resolved) { asked++; const r = E.resolveEvent(s, e.id, asked % 2 ? 'yes' : 'no'); assert(r.ok); } }); }
+  acted = s.log.filter(l => /【独断】|【幕府の政務】/.test(l.text)).length; assert(asked + acted > 0, '役職が動く'); assert(asked > 0, '忠義の者は伺いを立てる ' + asked + '/' + acted);
+});
+ok('85. 合流：同じ国で行き先が同じ御家人の軍は一つの部隊として進み、序列の高い家の大将の名「○○ 他N」で表す', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 3, mode: 'free' }); s.factions.yoritomo.status = '挙兵'; ['miura', 'chiba'].forEach(k => { s.factions[k].overlord = 'yoritomo'; });
+  const a = E.createArmy(s, 'miura', 'musashi', 500, 'yoshizumi', { food: 999 }), b = E.createArmy(s, 'chiba', 'musashi', 400, 'tsunetane', { food: 999 }); [a, b].forEach(x => { x.status = 'idle'; E.setArmyTarget(s, x, { type: 'province', id: 'izu' }, 'move'); x.status = 'marching'; });
+  E.mergeTick(s); const L = a.followers ? a : b, Fw = L === a ? b : a; assert.strictEqual(Fw.follow, L.id); assert(/ 他1（900）/.test(E.groupLabel(s, L)), E.groupLabel(s, L));
+  for (let d = 0; d < 4; d++) { E.advanceDay(s); s.pendingStops.forEach(e => e.resolved = true); } if (s.armies[Fw.id] && s.armies[L.id] && Fw.follow) assert.strictEqual(s.armies[Fw.id].province, s.armies[L.id].province, '一緒に進む');
+});
+ok('86. 兵火：大軍の攻防で火が放たれると数日燃え、その国の館・屋敷が焼けて守りが下がる。修復できる', () => {
+  const s = coalWorld(3); s.bases.oba_mikuriya.garrison = 1500; let fired = false;
+  for (let i = 0; i < 400 && !fired; i++) { const bt = { base: 'oba_mikuriya', province: 'sagami', days: 3, sides: { att: Object.keys(s.armies).filter(k => s.armies[k].faction !== 'oba'), def: [] } }; E.fireCheck(s, bt); fired = !!bt.fireDone; }
+  assert(fired && s.fires.length === 1); const d0 = s.bases.doi ? s.bases.doi.defense : null; E.fireTick(s);
+  assert(s.bases.oba_mikuriya.burned, '攻められた拠点が焼ける'); s.bases.oba_mikuriya.owner = 'yoritomo'; s.factions.yoritomo.money = 2000;
+  s.day = s.fires[0].until + 1; E.fireTick(s); assert.strictEqual(s.fires.length, 0, '火は鎮まる');
+  Object.keys(s.battles).forEach(k => delete s.battles[k]); const r = E.issueCommand(s, { type: 'repair', base: 'oba_mikuriya' }); assert(r.ok, r.reason); assert(!s.bases.oba_mikuriya.burned);
+});
+ok('87. 序列には執権・侍所別当などの役職も入る', () => {
+  const s = bakufuWorld(3); const f = s.factions.yoritomo; const r0 = E.gokeninRanking(s, 'yoritomo'); const m0 = r0.find(x => x.id === 'miura');
+  f.institutions = { samurai_dokoro: { head: s.factions.miura.leader } }; E.util && 0; s.shogunate = s.shogunate || {}; const r1 = E.gokeninRanking(s, 'yoritomo').find(x => x.id === 'miura');
+  assert(r1.kan > m0.kan && r1.titles.some(t => /侍所/.test(t)), '侍所別当が入る');
+});
 console.log(`\n${n} 件の受入条件をすべて満たした`);
