@@ -17,7 +17,7 @@
   else root.GenpeiEngine = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var ENGINE_VERSION = '0.28.0';
+  var ENGINE_VERSION = '0.29.0';
 
   // ================================================================ 乱数（シード固定・状態に保存）
   function rand(s) {
@@ -375,7 +375,7 @@
     siegeSupply(s);            // 籠城の兵糧・開城
     detectBattles(s);          // 遭遇判定
     resolveBattles(s);         // 戦闘・包囲
-    if (s.date.d === 1) { monthly(s); courtPolitics(s); regimeTick(s); shogunateTick(s); if (shogunId(s)) shogunTick(s); houseDrift(s); clanTick(s); serviceTick(s); politicsMonthly(s); arrivalsTick(s); ninkanMonthly(s); loyaltyTick(s); jokyuTick(s); templeTick(s); officeTick(s); Object.keys(s.factions).forEach(function (k) { if (k !== s.playerFaction && s.factions[k].alive) aiSpoils(s, k); }); }
+    if (s.date.d === 1) { monthly(s); courtPolitics(s); regimeTick(s); shogunateTick(s); if (shogunId(s)) shogunTick(s); houseDrift(s); clanTick(s); serviceTick(s); politicsMonthly(s); arrivalsTick(s); ninkanMonthly(s); loyaltyTick(s); jokyuTick(s); templeTick(s); officeTick(s); houseBuildTick(s); Object.keys(s.factions).forEach(function (k) { if (k !== s.playerFaction && s.factions[k].alive) aiSpoils(s, k); }); }
     birthsTick(s); reformsTick(s); // 経済（月次集計）・朝廷の派閥政治
     progressConstruction(s);   // 普請（築城）
     mortality(s);              // 人物の死亡判定
@@ -1009,7 +1009,10 @@
     Object.keys(s.houses || {}).forEach(function (k) {
       var h = s.houses[k], f = F(s, h.faction); if (!f || !f.alive) { h.influence = 0; return; }
       var ms = h.members.map(function (m) { return Pn(s, m); }).filter(function (p) { return p && p.alive && topLord(s, p.faction || '') === topLord(s, h.faction); });
-      if (h.head && !alive(s, h.head) && ms.length) { h.head = ms.sort(function (a, b) { return (b.abilities.politics + b.abilities.command) - (a.abilities.politics + a.abilities.command); })[0].id; news(s, h.name + 'の家督は' + pname(s, h.head) + 'が継いだ', { type: 'politics', factions: [h.faction] }); }
+      var deadH = h.head && !alive(s, h.head) ? Pn(s, h.head) : null, brs = deadH ? branchHeads(s, k).filter(function (q) { return q && canLead(q) && (deadH.relations || []).some(function (r) { return r.person === q.id && /父子|兄弟/.test(r.type); }); }) : [];
+      var brH = !deadH ? null : (h.heir && brs.some(function (q) { return q.id === h.heir; })) ? Pn(s, h.heir) : (!ms.length && brs.length ? brs.sort(function (a, b) { return (b.abilities.politics + b.abilities.command) - (a.abilities.politics + a.abilities.command); })[0] : (brs.filter(function (q) { return ms.every(function (m) { return (q.abilities.politics + q.abilities.command) > (m.abilities.politics + m.abilities.command) + 20; }); })[0] || null)); // 分家の当主も一門として家督の候補
+      if (brH) { mergeBranch(s, brH, k); h.head = brH.id; news(s, h.name + 'の家督は' + brH.name + 'が継いだ（分家から本家へ）', { type: 'politics', important: true, factions: [h.faction] }); }
+      else if (h.head && !alive(s, h.head) && ms.length) { h.head = ms.sort(function (a, b) { return (b.abilities.politics + b.abilities.command) - (a.abilities.politics + a.abilities.command); })[0].id; news(s, h.name + 'の家督は' + pname(s, h.head) + 'が継いだ', { type: 'politics', factions: [h.faction] }); }
       var offices = ms.reduce(function (t, p) { return t + (p.courtOffices || []).length + (p.warriorOffices || []).length * 2; }, 0);
       var marriage = ms.some(function (p) { return (p.relations || []).some(function (r) { return /夫婦/.test(r.type) && (r.person === f.leader || r.person === f.heir); }); }) ? 12 : ms.some(function (p) { return (p.relations || []).some(function (r) { return /乳母/.test(r.type) && (r.person === f.leader || r.person === f.heir); }); }) ? 8 : 0;
       var cmdr = Math.min(6, ms.filter(function (p) { return /^army:/.test(String(p.location || '')); }).length * 2);
@@ -1468,6 +1471,55 @@
     var cost = 60 + Math.round(b.maxDefense * 6); if (f.money < cost) return { ok: false, reason: '修復に' + cost + '貫が要る' };
     f.money -= cost; b.burned = false; b.defense = Math.max(b.defense, Math.round(b.maxDefense * 0.5)); // 残りは日ごとに戻る
     news(s, '【修復】' + b.name + 'の普請をやり直した', { type: 'build', factions: [fid], province: b.province }); return { ok: true, message: b.name + 'を修復した（' + cost + '貫。守りは日ごとに戻る）' };
+  }
+  // ---- 自軍・参陣の軍への命令：館に帰らせる（近くの味方の拠点へ戻って解散）、参陣の家を帰す
+  function returnHome(s, fid, cmd) {
+    var a = s.armies[cmd.army]; if (!a) return { ok: false, reason: '軍勢が見つからない' };
+    var mine = a.faction === fid, cp = s.corps[a.corps], contingent = !mine || a.house;
+    if (!mine && !(topLord(s, a.faction) === fid && (a.contingentOf === fid || (cp && cp.faction === fid) || (a.lordOrder && a.lordOrder.lord === fid)))) return { ok: false, reason: '自軍か、参陣している家の軍を選ぶこと' };
+    if (a.battleId) return { ok: false, reason: '交戦中は帰せない（退却を使う）' };
+    if (contingent && !mine || cmd.release) { var lab = armyLabel(s, a); a.corps = null; a.joinCorps = null; a.lordOrder = null; a.chase = null; disbandArmy(s, a, 'release'); news(s, lab + 'は陣を払って本領へ帰った', { type: 'military', factions: [a.faction] }); return { ok: true, message: lab + 'を帰した（兵は本領の武士団に戻る）' }; }
+    var bs = Object.keys(s.bases).map(function (k) { return s.bases[k]; }).filter(function (b) { return b.owner === fid || (b.owner && sameCamp(s, b.owner, fid) && b.house && H(s, b.house) && H(s, b.house).faction === fid); }).sort(function (x, y) { return distProv(s, a.province, x.province) - distProv(s, a.province, y.province); });
+    var hb = bs[0]; if (!hb) return { ok: false, reason: '戻る館がない' };
+    if (hb.province === a.province) { var lab2 = armyLabel(s, a); disbandArmy(s, a, 'garrison'); return { ok: true, message: lab2 + 'は' + hb.name + 'に戻って兵を休ませた' }; }
+    var e = setArmyTarget(s, a, { type: 'base', id: hb.id }, 'move'); if (e) return { ok: false, reason: e }; a.withdrawHome = true; a.corps = null; a.chase = null; a.mission = 'move';
+    return { ok: true, message: armyLabel(s, a) + 'を' + hb.name + 'へ帰らせる（着いたら兵を休ませる）' };
+  }
+  // ---- 一門の分家：館を与えて独立した家（分家）は一門のまま。本家の家督を継ぐことができ、継げば分家は本家に戻る
+  function rootOf(s, id) { var seen = {}, x = id; while (x && !seen[x]) { seen[x] = 1; var h = H(s, x); if (h && h.parent) x = h.parent; else break; } return x; }
+  function branchHeads(s, mainId) { return Object.keys(s.houses || {}).map(function (k) { return s.houses[k]; }).filter(function (h) { return !h.asFaction && h.parent && rootOf(s, h.id) === rootOf(s, mainId) && h.id !== mainId && h.head && alive(s, h.head); }).map(function (h) { return Pn(s, h.head); }); }
+  function mergeBranch(s, p, mainId) { // 分家の当主が本家を継ぐ：分家の館・所領・兵は本家のものになる
+    var bh = Object.keys(s.houses).map(function (k) { return s.houses[k]; }).filter(function (h) { return !h.asFaction && h.head === p.id && h.parent; })[0]; if (!bh) return;
+    var mainF = F(s, mainId), mainH = H(s, mainId) && !H(s, mainId).asFaction ? H(s, mainId) : null;
+    Object.keys(s.bases).forEach(function (k) { var b = s.bases[k]; if (b.house !== bh.id) return; if (mainF) { b.owner = mainF.id; b.house = null; } else b.house = mainH.id; });
+    Object.keys(s.holdings).forEach(function (k) { var h = s.holdings[k]; if (h.house !== bh.id) return; if (mainF) { h.controller = mainF.id; h.house = null; } else h.house = mainH.id; });
+    Object.keys(s.bands).forEach(function (k) { var b = s.bands[k]; if (b.house !== bh.id) return; if (mainF) { b.faction = mainF.id; b.house = null; } else b.house = mainH.id; });
+    Object.keys(s.armies).forEach(function (k) { var a = s.armies[k]; if (a.house !== bh.id) return; if (mainF) { a.faction = mainF.id; a.house = null; } else a.house = mainH.id; });
+    bh.members.forEach(function (m) { var q = Pn(s, m); if (!q) return; if (mainF) q.faction = mainF.id; else { q.faction = mainH.faction; if (mainH.members.indexOf(m) < 0) mainH.members.push(m); } });
+    if (mainF) { mainF.money += bh.money || 0; } else { mainH.money = (mainH.money || 0) + (bh.money || 0); }
+    delete s.houses[bh.id]; news(s, p.name + 'が本家を継ぎ、' + bh.name + 'は本家に戻った', { type: 'politics', important: true });
+  }
+  // ---- 家が力をつけると自ら館を建て、主君（NPC）は伸びてきた家に館を与える
+  function houseBuildTick(s) {
+    Object.keys(s.houses || {}).forEach(function (k) { var h = s.houses[k]; if (h.asFaction || !h.head || !alive(s, h.head)) return; var f = F(s, h.faction); if (!f || !f.alive) return;
+      if ((h.money || 0) < 150 || houseTroops(s, h.id) < 100) return;
+      if (Object.keys(s.bases).filter(function (b) { return s.bases[b].house === h.id; }).length >= 3 || Object.keys(s.constructions).some(function (c) { return s.constructions[c].house === h.id; })) return;
+      if (rand(s) > 0.04 + (h.influence || 0) / 600 + Math.min(0.06, houseTroops(s, h.id) / 6000)) return;
+      var seat = B(s, h.seat) || Object.keys(s.bases).map(function (b) { return s.bases[b]; }).filter(function (b) { return b.house === h.id; })[0], pv = seat ? seat.province : (houseBands(s, h.id)[0] || {}).province; if (!pv) return;
+      var cx = seat ? seat.x : PV(s, pv).x, cy = seat ? seat.y : PV(s, pv).y, x = null, y = null;
+      for (var i = 0; i < 8 && x == null; i++) { var tx = cx + rr(s, -10, 10), ty = cy + rr(s, -10, 10); if (!Object.keys(s.bases).some(function (b) { return Math.hypot(s.bases[b].x - tx, s.bases[b].y - ty) < 3; }) && Math.hypot(tx - PV(s, pv).x, ty - PV(s, pv).y) < 40) { x = tx; y = ty; } }
+      if (x == null) return; h.money -= 150;
+      var id = nid(s, 'build'), nm = surnameOf(pname(s, h.head)) + 'の新館'; s.constructions[id] = { id: id, faction: h.faction, house: h.id, province: pv, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, name: nm, scale: 'small', spec: BUILD.small, progress: 0, required: BUILD.small.days, started: s.day, threatDays: 0, paused: false };
+      news(s, '【普請】' + h.name + 'が' + PV(s, pv).name + 'で' + nm + 'の普請を始めた（家の力が増した）', { type: 'build', factions: [h.faction], province: pv });
+    });
+    // NPCの主君は、序列の上がった家に館を与える
+    Object.keys(s.factions).forEach(function (fid) { var f = s.factions[fid]; if (!f.alive || fid === s.playerFaction || fid === 'court' || rand(s) > 0.05) return;
+      var spare = Object.keys(s.bases).map(function (k) { return s.bases[k]; }).filter(function (b) { return b.owner === fid && !b.house && b.id !== f.capital && (b.type === '館' || b.type === '城') && !Object.keys(s.battles).some(function (k) { return s.battles[k].base === b.id; }); });
+      if (spare.length < 2) return; var rk = gokeninRanking(s, fid).filter(function (x) { return x.kind === 'house'; }); if (!rk.length) return;
+      var up = rk.filter(function (x) { var h = H(s, x.id); return h && (h.lastRank == null || x.rankNo < h.lastRank) && (h.granted == null || s.day - h.granted > 720); })[0];
+      rk.forEach(function (x) { var h = H(s, x.id); if (h) h.lastRank = x.rankNo; });
+      if (!up) return; var r = grantBase(s, fid, { base: spare[spare.length - 1].id, to: up.id, troops: 0 }); if (r.ok) aiLog(s, fid, '館を与える', up.name);
+    });
   }
   function siegeMinDays(b) { return 4 + Math.round((b.defense || 0) / 5); }
   // ---- 見張り：出陣中の軍を任意の味方の拠点に置き、留め置く（館に戻らない）。拠点が攻められると守りに加わる
@@ -2467,7 +2519,8 @@
   function retPersons(s, r) { return r.kind === 'house' ? H(s, r.id).members.map(function (m) { return Pn(s, m); }).filter(Boolean) : factionPersons(s, r.id).concat(F(s, r.id).leader && Pn(s, F(s, r.id).leader) ? [Pn(s, F(s, r.id).leader)] : []); }
   // 主君と血のつながった家（一門）は謀反を起こさない。縁戚（婚姻）は起こしにくい
   function kinship(s, lord, r) {
-    var L = F(s, lord); if (!L) return null; var lp = Pn(s, L.leader); var ids = [L.leader, L.heir].filter(Boolean);
+    var L = F(s, lord); if (!L) return null;
+    if (r.kind === 'house' && H(s, r.id) && H(s, r.id).parent) { if (rootOf(s, r.id) === lord) return 'blood'; var pr = H(s, r.id).parent; if (pr !== r.id && (H(s, pr) || F(s, pr))) { var pk = kinship(s, lord, { kind: H(s, pr) && !H(s, pr).asFaction ? 'house' : 'vassal', id: pr }); if (pk) return pk; } } /* 分家は本家の縁を引き継ぐ */ var lp = Pn(s, L.leader); var ids = [L.leader, L.heir].filter(Boolean);
     var ps = retPersons(s, r), blood = false, inlaw = false;
     ps.forEach(function (p) { (p.relations || []).forEach(function (x) { if (ids.indexOf(x.person) < 0) return; if (BLOOD.test(x.type)) blood = true; else if (/夫婦|舅|娘婿|乳母/.test(x.type)) inlaw = true; }); });
     if (lp) (lp.relations || []).forEach(function (x) { if (ps.some(function (p) { return p.id === x.person; })) { if (BLOOD.test(x.type)) blood = true; else if (/夫婦|舅|娘婿|乳母/.test(x.type)) inlaw = true; } });
@@ -3122,15 +3175,17 @@
     if (f.id === 'court') return;
     var fam = (dead.relations || []).filter(function (r) { return /父子|兄弟/.test(r.type); }).map(function (r) { return s.persons[r.person]; })
       .filter(function (p) { return p && p.alive && p.faction === f.id && canLead(p); });
-    var pool = fam.length ? fam : factionPersons(s, f.id).filter(function (p) { return canLead(p); });
+    var br = branchHeads(s, f.id).filter(function (p) { return p && canLead(p) && (dead.relations || []).some(function (r) { return r.person === p.id && /父子|兄弟/.test(r.type); }); }); // 一門の分家の当主も継げる
+    var pool = fam.length || br.length ? fam.concat(br) : factionPersons(s, f.id).filter(function (p) { return canLead(p); });
     // 嫡流優先：あらかじめ定めた後継者
-    var heir = f.heir && canLead(Pn(s, f.heir)) && Pn(s, f.heir).faction === f.id ? Pn(s, f.heir) : null;
+    var heir = f.heir && canLead(Pn(s, f.heir)) && (Pn(s, f.heir).faction === f.id || branchHeads(s, f.id).some(function (q) { return q && q.id === f.heir; })) ? Pn(s, f.heir) : null;
     if (!heir) { pool.sort(function (a, b) { return (b.abilities.politics + b.abilities.command) - (a.abilities.politics + a.abilities.command); }); heir = pool[0]; }
     if (!heir && f.type.indexOf('寺社') >= 0) { // 寺社は組織として存続し、新たな代表を立てる
       var nid2 = dead.id + '_s' + s.day; s.persons[nid2] = JSON.parse(JSON.stringify(dead)); heir = s.persons[nid2];
       heir.id = nid2; heir.name = f.name.replace(/（.*）/, '') + 'の新たな代表'; heir.alive = true; heir.born = null; heir.died = null; heir.birthConfidence = 'ゲーム設定'; heir.location = f.capital; heir.relations = []; heir.deathDay = null; heir.note = '前代表の死後に立てられた代表（架空）';
     }
     if (!heir) { destroyFaction(s, f, '当主の死去と後継者の不在'); return; }
+    if (heir.faction !== f.id) { mergeBranch(s, heir, f.id); heir.faction = f.id; } // 分家の当主が本家を継いだ
     f.leader = heir.id; if (s.politics) recHead(s, f.id, dead.id, heir.id, dead.alive ? '当主が政から退いた' : '当主の死');
     news(s, f.name + 'の家督は' + heir.name + 'が継いだ', { type: 'politics', important: true, factions: [f.id] });
     if (heir.born && s.date.y - heir.born < 15) news(s, '幼少の当主のため、一門の後見が政務を執る', { factions: [f.id] });
@@ -3612,7 +3667,7 @@
       c.progress += laborRate(s, c.province);
       if (c.progress >= c.required) {
         var id = 'built_' + k;
-        s.bases[id] = { id: id, name: c.name, province: c.province, type: c.spec.type, owner: c.faction, defense: c.spec.defense, maxDefense: c.spec.defense, garrison: c.spec.garrison, x: c.x, y: c.y, confidence: 'ゲーム設定', note: c.spec.note + '（' + dateStr(s) + '完成）', built: true };
+        s.bases[id] = { id: id, name: c.name, province: c.province, type: c.spec.type, owner: c.faction, house: c.house && H(s, c.house) && H(s, c.house).faction === c.faction ? c.house : null, defense: c.spec.defense, maxDefense: c.spec.defense, garrison: c.spec.garrison, x: c.x, y: c.y, confidence: 'ゲーム設定', note: c.spec.note + '（' + dateStr(s) + '完成）', built: true };
         delete s.constructions[k];
         news(s, '【完成】' + c.name + '（' + c.spec.label + '）が完成した', { type: 'build', important: true, factions: [c.faction], province: c.province });
         if (c.faction === s.playerFaction) stop(s, { key: 'build_done', title: c.name + ' 完成', place: PV(s, c.province).name, text: c.spec.label + 'が完成した。防御 ' + c.spec.defense + '、守備兵 ' + c.spec.garrison + '。本拠に定めることもできる。', choices: [] });
@@ -3627,7 +3682,12 @@
       if (a.commander && !alive(s, a.commander)) { a.commander = a.officers.filter(function (o) { return alive(s, o); })[0] || null; if (a.officers.indexOf(a.commander) >= 0) a.officers.splice(a.officers.indexOf(a.commander), 1); }
       if (a.commander && Pn(s, a.commander).captiveOf) a.commander = null;
     });
-    Object.keys(s.corps || {}).forEach(function (cid) { if (!Object.keys(s.armies).some(function (k) { return s.armies[k].corps === cid; })) delete s.corps[cid]; });
+    Object.keys(s.corps || {}).forEach(function (cid) { var cp = s.corps[cid], arms = Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return a.corps === cid || a.joinCorps === cid; });
+      if (!arms.some(function (a) { return a.corps === cid; })) { arms.forEach(function (a) { a.joinCorps = null; }); delete s.corps[cid]; return; }
+      if (cp.faction && !arms.some(function (a) { return a.faction === cp.faction && !a.house; })) { // 主君の軍がいなくなった軍団は解く（参陣の家の軍は陣を払って帰る）
+        arms.forEach(function (a) { a.corps = null; a.joinCorps = null; if (!a.battleId) { a.mission = 'idle'; if (a.faction !== s.playerFaction || a.house) disbandArmy(s, a, 'release'); } });
+        news(s, (pname(s, cp.commander) || '') + 'の軍団は解かれ、参陣の家々は陣を払って本領へ帰った', { type: 'military', factions: [cp.faction] }); delete s.corps[cid]; } });
+    Object.keys(s.persons).forEach(function (k) { var p = s.persons[k]; var m = /^army:(.+)$/.exec(String(p.location || '')); if (m && !s.armies[m[1]]) { var f0 = F(s, p.faction); p.location = f0 && f0.capital ? f0.capital : null; } }); // 消えた軍にいたままの人を戻す
     Object.keys(s.factions).forEach(function (k) {
       var f = s.factions[k]; if (!f.alive || k === 'court') return;
       if (k === s.playerFaction && factionBases(s, k).length) s.flags.playerHadBase = true;
@@ -4845,6 +4905,7 @@
       case 'reward': return giveReward(s, cmd.faction, cmd);
       case 'intercept': return intercept(s, cmd.faction, cmd);
       case 'station': return stationArmy(s, cmd.faction, cmd);
+      case 'return_home': return returnHome(s, cmd.faction, cmd);
       case 'temple_permit': return templePermit(s, cmd.faction);
       case 'kaikon': return kaikon(s, cmd.faction, cmd);
       case 'delegate': return setDelegate(s, cmd.faction, cmd);
@@ -4858,7 +4919,8 @@
       case 'appoint_office': return shikkenAppoint(s, cmd.faction, cmd);
       case 'build_facility': return buildFacility(s, cmd.faction, cmd);
       case 'split_corps': return splitCorps(s, cmd.faction, cmd);
-      case 'set_heir': { var hp = Pn(s, cmd.person); if (!hp || !hp.alive || hp.faction !== cmd.faction || hp.id === f.leader) return { ok: false, reason: '自家の存命の一門を指定すること' }; f.heir = hp.id; ensureRegime(s); f.regime.heirStab = Math.max(0, f.regime.heirStab - 5); news(s, f.name + 'は' + hp.name + 'を後継者に定めた', { type: 'politics', factions: [cmd.faction] }); return { ok: true, message: hp.name + 'を後継者に定めた' }; }
+      case 'set_heir': { var hp = Pn(s, cmd.person); if (hp && hp.alive && hp.faction !== cmd.faction && branchHeads(s, cmd.faction).some(function (q) { return q && q.id === hp.id; })) { f.heir = hp.id; news(s, f.name + 'は一門の分家の' + hp.name + 'を後継者に定めた', { type: 'politics', factions: [f.id] }); return { ok: true, message: hp.name + '（分家の当主）を後継者に定めた。継げば分家は本家に戻る' }; }
+        if (!hp || !hp.alive || hp.faction !== cmd.faction || hp.id === f.leader) return { ok: false, reason: '自家の存命の一門を指定すること' }; f.heir = hp.id; ensureRegime(s); f.regime.heirStab = Math.max(0, f.regime.heirStab - 5); news(s, f.name + 'は' + hp.name + 'を後継者に定めた', { type: 'politics', factions: [cmd.faction] }); return { ok: true, message: hp.name + 'を後継者に定めた' }; }
       case 'donate': {
         var b = B(s, cmd.base); if (!b || b.type !== '寺社') return { ok: false, reason: '寄進先の寺社を指定してください' };
         var amt = Math.max(0, cmd.amount || 0); if (f.money < amt) return { ok: false, reason: '資金不足（所持' + Math.floor(f.money) + '貫）' };
@@ -4937,7 +4999,7 @@
       case 'court_gift': return '朝廷の派閥へ献金' + c.amount + '貫';
       case 'jito': return (s.holdings[c.holding] ? s.holdings[c.holding].name : '') + 'に地頭を置く';
       case 'regime': return (REGIME_ACTS[c.action] || {}).label || '体制の施策';
-      case 'bakufu': return '幕府政治'; case 'reform': return (REFORMS[c.kind] || {}).label || '制度改革'; case 'yashiki': return '屋敷を構える'; case 'jokyo': return '上洛'; case 'grant_base': return (B(s, c.base) ? B(s, c.base).name : '館') + 'を与える'; case 'rename_base': return '館の名を改める'; case 'nominate': return '任官の推挙：' + (Pn(s, c.person) ? Pn(s, c.person).name : '') + ((KAN[c.office] || {}).name ? '（' + KAN[c.office].name + '）' : ''); case 'resign_office': return '官を辞させる'; case 'bestow': return '御恩：' + ((BESTOW[c.kind] || {}).label || ''); case 'reward': return '恩賞：' + (REWARD_KINDS[c.kind] || ''); case 'intercept': return '敵軍の迎撃'; case 'station': return c.merge ? '守備兵に加える' : '見張りに置く'; case 'temple_permit': return '寺社建立の勅許を願う'; case 'kaikon': return '開墾'; case 'delegate': return '委任の設定'; case 'repair': return '修復'; case 'withdraw': return (s.armies[c.army] ? armyLabel(s, s.armies[c.army]) : '軍勢') + 'の退却'; case 'vassal_command': return '御家人への命：' + ({ muster: '兵を増やせ', recall: '帰陣', attack: '出陣', defend: '守り', join: '軍団に加われ' }[c.act] || ''); case 'vassal_order': return '指図：' + ({ attack: '出陣の要請', defend: '守りの要請', join: '軍団への合流' }[c.act] || ''); case 'politics': return { consult: '合議', guard: '警固', spy: '諜報', divide: '切り崩し', strike: '反対派の弾圧', compromise: '妥協', retire: '隠居' }[c.act] || '政治'; case 'appoint_office': return '幕府の人事';
+      case 'bakufu': return '幕府政治'; case 'reform': return (REFORMS[c.kind] || {}).label || '制度改革'; case 'yashiki': return '屋敷を構える'; case 'jokyo': return '上洛'; case 'grant_base': return (B(s, c.base) ? B(s, c.base).name : '館') + 'を与える'; case 'rename_base': return '館の名を改める'; case 'nominate': return '任官の推挙：' + (Pn(s, c.person) ? Pn(s, c.person).name : '') + ((KAN[c.office] || {}).name ? '（' + KAN[c.office].name + '）' : ''); case 'resign_office': return '官を辞させる'; case 'bestow': return '御恩：' + ((BESTOW[c.kind] || {}).label || ''); case 'reward': return '恩賞：' + (REWARD_KINDS[c.kind] || ''); case 'intercept': return '敵軍の迎撃'; case 'return_home': return c.release ? '陣を払わせる' : '館に帰らせる'; case 'station': return c.merge ? '守備兵に加える' : '見張りに置く'; case 'temple_permit': return '寺社建立の勅許を願う'; case 'kaikon': return '開墾'; case 'delegate': return '委任の設定'; case 'repair': return '修復'; case 'withdraw': return (s.armies[c.army] ? armyLabel(s, s.armies[c.army]) : '軍勢') + 'の退却'; case 'vassal_command': return '御家人への命：' + ({ muster: '兵を増やせ', recall: '帰陣', attack: '出陣', defend: '守り', join: '軍団に加われ' }[c.act] || ''); case 'vassal_order': return '指図：' + ({ attack: '出陣の要請', defend: '守りの要請', join: '軍団への合流' }[c.act] || ''); case 'politics': return { consult: '合議', guard: '警固', spy: '諜報', divide: '切り崩し', strike: '反対派の弾圧', compromise: '妥協', retire: '隠居' }[c.act] || '政治'; case 'appoint_office': return '幕府の人事';
       case 'spoil': return '没官領の処分'; case 'ando': return '本領安堵'; case 'grant': return '新恩給与'; case 'confiscate': return '所領の没収';
       case 'build_facility': return (FACILITIES[c.kind] || {}).label + 'の普請'; case 'split_corps': return '軍団の分割';
       case 'set_heir': return pname(s, c.person) + 'を後継者に';
@@ -5062,6 +5124,7 @@
     createGame: createGame, advanceDay: advanceDay, runDays: runDays, runUntilMonthEnd: runUntilMonthEnd,
     issueCommand: issueCommand, BUILD: BUILD, buildRights: buildRights, INSTITUTIONS: INSTITUTIONS, bakufuCheck: bakufuCheck,
     createArmy: createArmy, changeAllegiance: changeAllegiance, issueTsuito: issueTsuito, resolveSubmission: resolveSubmission,
+    returnHome: returnHome, rootOf: rootOf, branchHeads: branchHeads, houseBuildTick: houseBuildTick, mergeBranch: mergeBranch,
     templePermit: templePermit, kaikon: kaikon, setDelegate: setDelegate, DELEGATE: DELEGATE, delegateTick: delegateTick, officeTick: officeTick, mergeTick: mergeTick, groupLabel: groupLabel, fireCheck: fireCheck, fireTick: fireTick, repairBase: repairBase, kaikonTick: kaikonTick, templeTick: templeTick,
     volunteerTick: volunteerTick, stationArmy: stationArmy, siegeMinDays: siegeMinDays, setArmyTarget: setArmyTarget, battleMerit: battleMerit, giveReward: giveReward, intercept: intercept, chaseTick: chaseTick, REWARD_KINDS: REWARD_KINDS,
     CLANS: CLANS, migrateClans: migrateClans, nabikiTick: nabikiTick, offerSubmission: offerSubmission, kyogataRally: kyogataRally, kyogataOf: kyogataOf, gokeninRanking: gokeninRanking, jokyuTick: jokyuTick, meritOf: meritOf,

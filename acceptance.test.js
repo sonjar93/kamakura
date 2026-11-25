@@ -877,4 +877,24 @@ ok('87. 序列には執権・侍所別当などの役職も入る', () => {
   f.institutions = { samurai_dokoro: { head: s.factions.miura.leader } }; E.util && 0; s.shogunate = s.shogunate || {}; const r1 = E.gokeninRanking(s, 'yoritomo').find(x => x.id === 'miura');
   assert(r1.kan > m0.kan && r1.titles.some(t => /侍所/.test(t)), '侍所別当が入る');
 });
+ok('88. 軍団の後始末：主君の軍がいなくなった軍団は解かれ、参陣の家は帰る。消えた軍にいた大将は戻り、再び出陣できる。自軍は館に帰らせられる', () => {
+  const s = coalWorld(3); const a1 = Object.values(s.armies).find(a => a.faction === 'yoritomo'); const cid = 'corpsX'; s.corps[cid] = { id: cid, faction: 'yoritomo', commander: 'yoritomo', target: { type: 'base', id: 'oba_mikuriya' }, contingents: [] };
+  const a2 = Object.values(s.armies).find(a => a.faction === 'miura'); Object.keys(s.battles).forEach(k => delete s.battles[k]); [a1, a2].forEach(a => { a.battleId = null; a.status = 'idle'; a.corps = cid; });
+  s.persons.yoritomo.location = 'army:' + a1.id; delete s.armies[a1.id]; E.advanceDay(s);
+  assert(!s.corps[cid], '軍団は解かれる'); assert(!s.armies[a2.id], '参陣の家は帰る'); assert(!/^army:/.test(s.persons.yoritomo.location || ''), '大将は戻る');
+  const g = E.createArmy(s, 'yoritomo', 'musashi', 300, 'sanehira', { food: 99 }); g.status = 'idle'; const r = E.issueCommand(s, { type: 'return_home', army: g.id }); assert(r.ok, r.reason); assert(g.withdrawHome || !s.armies[g.id]);
+});
+ok('89. 一門の分家：館を与えて独立した一門は分家（一門のまま）。本家の後継者に指定でき、継げば分家は本家に戻る', () => {
+  const s = bakufuWorld(6); s.bases.yamaki.owner = 'yoritomo'; const lf = s.factions.miura, m = Object.values(s.persons).find(p => p.alive && p.faction === 'miura' && p.id !== lf.leader && (p.relations || []).some(r => r.person === lf.leader && /父子|兄弟/.test(r.type)));
+  assert(m, '三浦の一門'); assert(E.issueCommand(s, { type: 'grant_base', faction: 'yoritomo', base: 'yamaki', to: m.id, troops: 0 }).ok); const hid = 'h_' + m.id;
+  assert.strictEqual(E.rootOf(s, hid), 'miura', '分家は本家につながる'); assert(E.branchHeads(s, 'miura').some(p => p.id === m.id));
+  s.playerFaction = 'miura'; const r = E.issueCommand(s, { type: 'set_heir', faction: 'miura', person: m.id }); assert(r.ok, r.reason); s.playerFaction = 'yoritomo';
+  E.killPerson(s, s.persons[lf.leader], 'illness'); assert.strictEqual(s.factions.miura.leader, m.id, '分家の当主が本家を継ぐ'); assert(!s.houses[hid], '分家は本家に戻る'); assert.strictEqual(s.bases.yamaki.owner, 'miura');
+});
+ok('90. 家の普請：力をつけた家は自ら新しい館を建てる', () => {
+  const s = bakufuWorld(3); const h = Object.values(s.houses).find(x => !x.asFaction && x.head && s.persons[x.head] && s.persons[x.head].alive); assert(h);
+  h.money = 2000; h.influence = 60; const b0 = Object.values(s.bands).find(b => b.house === h.id) || (s.bands.hx = { id: 'hx', faction: h.faction, house: h.id, province: 'sagami', strength: 400, base: 400, mobilized: 0 }); b0.strength = Math.max(b0.strength, 400);
+  let started = false; for (let i = 0; i < 200 && !started; i++) { E.houseBuildTick(s); started = Object.values(s.constructions).some(c => c.house === h.id); } assert(started, '家の普請が始まる');
+  const c = Object.values(s.constructions).find(c => c.house === h.id); c.progress = c.required; E.advanceDay(s); assert(Object.values(s.bases).some(b => b.house === h.id && /新館/.test(b.name)), '家の館になる');
+});
 console.log(`\n${n} 件の受入条件をすべて満たした`);

@@ -17,7 +17,7 @@
   else root.GenpeiEngine = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var ENGINE_VERSION = '0.22.0';
+  var ENGINE_VERSION = '0.29.0';
 
   // ================================================================ 乱数（シード固定・状態に保存）
   function rand(s) {
@@ -180,7 +180,7 @@
     scn.relations.forEach(function (r) { var x = rel(s, r.a, r.b); x.value = r.value; x.status = r.status; x.war = false; });
     if (s.playerFaction && (!s.factions[s.playerFaction] || !s.factions[s.playerFaction].playable)) throw new Error('選択できない勢力です: ' + s.playerFaction);
     if (s.playerFaction && factionBases(s, s.playerFaction).length) s.flags.playerHadBase = true;
-    ensureCourt(s); ensureHoldings(s); ensureRegime(s); migrateHouses(s); migrateHouses3(s); migrateHouses4(s); ensurePlayer(s); ensurePolitics(s); ensureNinkan(s);
+    ensureCourt(s); ensureHoldings(s); ensureRegime(s); migrateHouses(s); migrateHouses3(s); migrateHouses4(s); migrateHouses5(s); migrateClans(s); ensureYashiki(s); ensurePlayer(s); ensurePolitics(s); ensureNinkan(s);
     news(s, scn.meta.title + ' 開始（' + (s.options.mode === 'historical' ? '史実モード：主要な出来事は史実の日付に起こる' : '自由モード：史実は強制されない') + '）。' + (s.playerFaction ? 'プレイヤー勢力：' + fname(s, s.playerFaction) : '観戦モード'), { important: true, type: 'system' });
     var v = validate(s); if (v.errors.length) news(s, '年代検証で ' + v.errors.length + ' 件の矛盾を検出', { type: 'system' });
     return s;
@@ -199,11 +199,16 @@
     var garrison = factionBases(s, fid).reduce(function (t, b) { return t + b.garrison; }, 0);
     return { bandTotal: Math.round(total), field: Math.round(field), garrison: Math.round(garrison), available: availableBandTroops(s, fid) };
   }
+  var _cpCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null; // 陣営の兵力は一日のうちは使い回す（勢力が多いと重いため）
   function campPower(s, fid) { // 主従を含む陣営の兵力
-    var lord = topLord(s, fid), t = 0;
+    var lord = topLord(s, fid), c = _cpCache ? _cpCache.get(s) : null;
+    if (!c || c.day !== s.day) { c = { day: s.day, v: {} }; if (_cpCache) _cpCache.set(s, c); }
+    if (c.v[lord] != null) return c.v[lord];
+    var t = 0;
     Object.keys(s.factions).forEach(function (k) { var f = s.factions[k]; if (f.alive && topLord(s, k) === lord) { var p = factionPower(s, k); t += p.available + p.field + p.garrison; } });
-    return t;
+    c.v[lord] = t; return t;
   }
+  function campPowerFresh(s, fid) { if (_cpCache) _cpCache.delete(s); return campPower(s, fid); }
   function holdingsOf(s, fid) { return Object.keys(s.holdings).map(function (k) { return s.holdings[k]; }).filter(function (h) { return h.controller === fid; }); }
   function provinceInfluence(s, pid) {
     var by = {};
@@ -370,7 +375,7 @@
     siegeSupply(s);            // 籠城の兵糧・開城
     detectBattles(s);          // 遭遇判定
     resolveBattles(s);         // 戦闘・包囲
-    if (s.date.d === 1) { monthly(s); courtPolitics(s); regimeTick(s); shogunateTick(s); if (shogunId(s)) shogunTick(s); houseDrift(s); clanTick(s); politicsMonthly(s); arrivalsTick(s); ninkanMonthly(s); loyaltyTick(s); Object.keys(s.factions).forEach(function (k) { if (k !== s.playerFaction && s.factions[k].alive) aiSpoils(s, k); }); }
+    if (s.date.d === 1) { monthly(s); courtPolitics(s); regimeTick(s); shogunateTick(s); if (shogunId(s)) shogunTick(s); houseDrift(s); clanTick(s); serviceTick(s); politicsMonthly(s); arrivalsTick(s); ninkanMonthly(s); loyaltyTick(s); jokyuTick(s); templeTick(s); officeTick(s); houseBuildTick(s); Object.keys(s.factions).forEach(function (k) { if (k !== s.playerFaction && s.factions[k].alive) aiSpoils(s, k); }); }
     birthsTick(s); reformsTick(s); // 経済（月次集計）・朝廷の派閥政治
     progressConstruction(s);   // 普請（築城）
     mortality(s);              // 人物の死亡判定
@@ -379,8 +384,8 @@
     runAI(s);                  // AI勢力
     checkEvents(s);            // 歴史イベント
     cleanup(s);
-    syncSeatHoldings(s); facilitiesTick(s); contingentsTick(s); lordOrderTick(s); volunteerTick(s); haishoTick(s);
-    politicsDaily(s); ninkanTick(s);
+    syncSeatHoldings(s); facilitiesTick(s); contingentsTick(s); chaseTick(s); kaikonTick(s); fireTick(s); delegateTick(s); mergeTick(s); lordOrderTick(s); volunteerTick(s); haishoTick(s); jokyoTick(s);
+    politicsDaily(s); ninkanTick(s); nabikiTick(s);
     checkVictory(s);           // 天下統一と5年の維持
     var newStops = s.pendingStops.slice(before);
     return { stops: newStops, blocked: false };
@@ -425,10 +430,13 @@
   function moveArmies(s) {
     Object.keys(s.armies).forEach(function (k) {
       var a = s.armies[k];
+      if (a.follow) { var LF = s.armies[a.follow]; // 合流した部隊は先頭の部隊と一緒に進む
+        if (!LF || LF.battleId || a.battleId || !LF.target || !a.target || LF.target.id !== a.target.id || LF.target.type !== a.target.type) a.follow = null;
+        else if (a.status !== 'gathering' && LF.status === 'marching') { a.province = LF.province; a.edge = LF.edge ? JSON.parse(JSON.stringify(LF.edge)) : null; a.path = LF.path.slice(); a.status = 'marching'; a.fatigue = Math.max(a.fatigue, LF.fatigue); a.idleDays = 0; return; } }
       if (a.faction === s.playerFaction) { // 命令のないまま留まる自軍は、しばらくすると館に戻る（出陣したまま放置されるのを防ぐ）
         if (a.regroup && (a.status === 'idle' || a.status === 'arrived') && a.morale >= 55) { var rb = B(s, a.regroup); a.regroup = null; a.holdUntil = null; if (rb && rb.owner && !sameCamp(s, rb.owner, a.faction)) { news(s, armyLabel(s, a) + 'は士気を取り戻し、' + rb.name + 'へ再び攻めかかる', { type: 'military', factions: [a.faction] }); setArmyTarget(s, a, { type: 'base', id: rb.id }, 'attack'); return; } }
         if (a.withdrawHome && (a.status === 'idle' || a.status === 'arrived') && Object.keys(s.bases).some(function (b) { return s.bases[b].province === a.province && sameCamp(s, s.bases[b].owner, a.faction); })) { news(s, armyLabel(s, a) + 'は退いて館に戻り、兵を休ませた', { type: 'military', factions: [a.faction] }); disbandArmy(s, a, 'garrison'); return; }
-        if ((a.status === 'idle' || a.status === 'arrived') && !(a.holdUntil > s.day)) a.idleDays = (a.idleDays || 0) + 1; else a.idleDays = 0;
+        if ((a.status === 'idle' || a.status === 'arrived') && !(a.holdUntil > s.day) && a.mission !== 'guard') a.idleDays = (a.idleDays || 0) + 1; else a.idleDays = 0;
         var ownB = Object.keys(s.bases).some(function (b) { return s.bases[b].province === a.province && sameCamp(s, s.bases[b].owner, a.faction); });
         if (a.idleDays >= 20 && ownB && !(a.corps && s.corps[a.corps] && s.corps[a.corps].target && s.corps[a.corps].target.type === 'base' && !sameCamp(s, B(s, s.corps[a.corps].target.id).owner, a.faction) && Object.keys(s.armies).some(function (o) { var x = s.armies[o]; return x.corps === a.corps && x.status !== 'idle' && x.status !== 'arrived'; }))) {
           news(s, armyLabel(s, a) + 'は命令のないまま20日が過ぎたため、' + PV(s, a.province).name + 'の館に戻って兵を休ませた（武士団に戻り、再び出陣できる）', { type: 'military', important: true, factions: [a.faction], province: a.province });
@@ -459,11 +467,15 @@
       var b = B(s, a.target.id);
       if (b.owner === a.faction || sameCamp(s, b.owner, a.faction) || !b.owner) {
         a.base = b.id; a.mission = a.mission === 'attack' ? 'idle' : a.mission;
+        var sb = b.owner && Object.keys(s.battles).map(function (k) { return s.battles[k]; }).filter(function (x) { return x.base === b.id; })[0];
+        if (sb && sb.sides.def.indexOf(a.id) < 0) { sb.sides.def.push(a.id); a.battleId = sb.id; a.status = 'battle'; sb.start.def += a.troops; btMark(s, sb); news(s, armyLabel(s, a) + 'が' + b.name + 'の救援に入った', { type: 'battle', important: true, factions: [a.faction], province: b.province }); }
         if (!b.owner && a.mission !== 'move') { /* 無主の拠点を確保 */ }
         if (!b.owner) { b.owner = a.faction; news(s, fname(s, a.faction) + 'が' + b.name + 'を押さえた', { type: 'military', factions: [a.faction], province: b.province }); }
       } else if (atWar(s, a.faction, b.owner)) {
         a.status = 'siege'; a.mission = 'attack';
-        startBaseBattle(s, a, b);
+        var ob = Object.keys(s.battles).map(function (k) { return s.battles[k]; }).filter(function (x) { return x.base === b.id && x.sides.att.some(function (id) { return s.armies[id] && sameCamp(s, s.armies[id].faction, a.faction); }); })[0];
+        if (ob) { ob.sides.att.push(a.id); a.battleId = ob.id; a.status = 'battle'; ob.start.att += a.troops; btMark(s, ob); news(s, armyLabel(s, a) + 'が' + b.name + 'の攻め手に加わった', { type: 'battle', factions: [a.faction], province: b.province }); }
+        else startBaseBattle(s, a, b);
       } else { a.base = null; news(s, armyLabel(s, a) + 'は' + b.name + 'に到着したが、交戦状態にないため攻撃しない', { factions: [a.faction] }); }
     }
     if (a.target && a.target.type === 'province') a.mission = a.mission === 'attack' ? 'hold' : a.mission;
@@ -630,6 +642,19 @@
     var bf = s.battlefields[pid];
     return (bf || PV(s, pid).name) + 'の戦い';
   }
+  // 合戦に加わった軍勢を記録する（働きの集計用）
+  function btMark(s, bt) {
+    bt.init = bt.init || {};
+    ['att', 'def'].forEach(function (sd) { bt.sides[sd].forEach(function (id) { var a = s.armies[id]; if (!a) return; var r = bt.init[id];
+      if (!r) { var cp0 = s.corps[a.joinCorps || a.corps]; r = bt.init[id] = { t: a.troops, side: sd, faction: a.faction, house: a.house || null, cmd: a.commander || null, senjin: false, lordOrdered: (cp0 && cp0.faction) || (a.lordOrder && a.lordOrder.lord) || (a.contingentOf) || null }; }
+      if (!r.lordOrdered) { var cp1 = s.corps[a.joinCorps || a.corps]; r.lordOrdered = (cp1 && cp1.faction) || (a.lordOrder && a.lordOrder.lord) || a.contingentOf || null; } // 途中で指図した場合も
+      r.last = a.troops; var cpx = s.corps[a.joinCorps || a.corps]; if (cpx && cpx.senjin && (cpx.senjin === (a.house || a.faction))) r.senjin = true; }); });
+  }
+  function playerOwnStop(s, factions, baseOwner) { // 時間を止めるのは、プレイヤー自身の軍勢か、味方の拠点が攻められたときだけ（御家人の攻めは知らせのみ）
+    if (!s.playerFaction) return false;
+    if (factions.some(function (f) { return f === s.playerFaction; })) return true;
+    return !!baseOwner && involvesPlayer(s, baseOwner);
+  }
   function joinAllies(s, bt) {
     provinceArmies(s, bt.province).forEach(function (x) {
       if (x.battleId) return;
@@ -642,12 +667,13 @@
     var bt = { id: id, name: battleName(s, pid), province: pid, base: null, sides: { att: [att.id], def: [def.id] }, startDay: s.day, days: 0,
       start: { att: att.troops, def: def.troops }, losses: { att: 0, def: 0 }, attFaction: att.faction, defFaction: def.faction, log: [] };
     s.battles[id] = bt; att.battleId = id; def.battleId = id; att.status = 'battle'; def.status = 'battle';
-    joinAllies(s, bt);
+    joinAllies(s, bt); btMark(s, bt);
     // 奇襲判定（知略差・夜襲）
     var ai = att.commander ? Pn(s, att.commander).abilities.intellect : 40, di = def.commander ? Pn(s, def.commander).abilities.intellect : 40;
     bt.surprise = rand(s) < clamp(0.1 + (ai - di) / 150, 0.03, 0.4) ? 'att' : null;
     var ev = news(s, '【合戦】' + bt.name + '：' + armyLabel(s, att) + ' と ' + armyLabel(s, def) + ' が激突' + (bt.surprise ? '（奇襲）' : ''), { type: 'battle', important: true, factions: [att.faction, def.faction], province: pid });
-    if (involvesPlayer(s, att.faction) || involvesPlayer(s, def.faction))
+    var fsF = bt.sides.att.concat(bt.sides.def).map(function (id) { return s.armies[id] && s.armies[id].faction; });
+    if (false)
       stop(s, { key: 'battle_start', title: bt.name, place: PV(s, pid).name, persons: [att.commander, def.commander].filter(Boolean), battle: id,
         text: fname(s, att.faction) + '（' + pname(s, att.commander) + '・' + Math.round(att.troops) + '）と' + fname(s, def.faction) + '（' + pname(s, def.commander) + '・' + Math.round(def.troops) + '）が' + PV(s, pid).name + 'で交戦を開始した。戦闘は自動で解決される。' + (bt.surprise ? '攻め手が奇襲に成功した。' : ''),
         choices: [] });
@@ -664,14 +690,14 @@
       start: { att: a.troops, def: b.garrison }, losses: { att: 0, def: 0 }, attFaction: a.faction, defFaction: b.owner, log: [] };
     provinceArmies(s, b.province).forEach(function (x) { if (!x.battleId && x.base === b.id && sameCamp(s, x.faction, b.owner)) { bt.sides.def.push(x.id); x.battleId = id; x.status = 'battle'; bt.start.def += x.troops; } });
     s.battles[id] = bt; a.battleId = id; a.status = 'battle';
-    joinAllies(s, bt);
+    joinAllies(s, bt); btMark(s, bt);
     var ai = a.commander ? Pn(s, a.commander).abilities.intellect : 40;
     bt.surprise = rand(s) < clamp(0.12 + ai / 400, 0.05, 0.35) ? 'att' : null;
     news(s, '【合戦】' + bt.name + '：' + armyLabel(s, a) + 'が' + b.name + '（守備' + Math.round(bt.start.def) + '）を攻撃' + (bt.surprise ? '（夜襲）' : ''), { type: 'battle', important: true, factions: [a.faction, b.owner], province: b.province });
     if (b.id === 'kofukuji' || b.id === 'todaiji') s.flags.nantoAttacked = b.id;
-    if (involvesPlayer(s, a.faction) || involvesPlayer(s, b.owner))
-      stop(s, { key: 'battle_start', title: bt.name, place: b.name, persons: [a.commander].filter(Boolean), battle: id,
-        text: fname(s, a.faction) + 'の' + armyLabel(s, a) + 'が' + fname(s, b.owner) + 'の' + b.name + 'を攻撃した。守備兵 ' + Math.round(bt.start.def) + '、防御 ' + b.defense + '。', choices: [] });
+    if (s.playerFaction && b.owner === s.playerFaction && !sameCamp(s, a.faction, s.playerFaction)) // 自分の拠点が攻められたときだけ知らせて止める（援軍を送れるように）
+      stop(s, { key: 'base_attacked', base: b.id, province: b.province, title: b.name + 'が攻められた', place: b.name, persons: [a.commander].filter(Boolean), battle: id,
+        text: fname(s, a.faction) + 'の' + armyLabel(s, a) + 'が' + b.name + 'を攻めてきた。守備兵 ' + Math.round(bt.start.def) + '、防御 ' + b.defense + '。少なくとも' + siegeMinDays(b) + '日は持ちこたえる。援軍を送るか、見張りの兵を置いた軍を差し向けられる。', choices: [{ id: 'relief', label: '援軍を出す（出陣の編成を開く）' }, { id: 'ok', label: '了解（守備兵に任せる）' }] });
     return bt;
   }
   function involvesPlayer(s, fid) { return !!s.playerFaction && fid && (fid === s.playerFaction || topLord(s, fid) === s.playerFaction); }
@@ -725,7 +751,7 @@
   }
   function resolveBattles(s) {
     Object.keys(s.battles).forEach(function (k) {
-      var bt = s.battles[k]; bt.days += 1;
+      var bt = s.battles[k]; bt.days += 1; btMark(s, bt); fireCheck(s, bt);
       bt.sides.att = bt.sides.att.filter(function (id) { return s.armies[id] && s.armies[id].troops > 0; });
       bt.sides.def = bt.sides.def.filter(function (id) { return s.armies[id] && s.armies[id].troops > 0; });
       var A = sidePower(s, bt.sides.att, false, bt), D = sidePower(s, bt.sides.def, true, bt);
@@ -751,6 +777,7 @@
       var mA = avg(s, bt.sides.att, 'morale'), mD = bt.sides.def.length ? avg(s, bt.sides.def, 'morale') : 60;
       var curA = A.troops - lossA, curD = D.troops - lossD;
       if (mA < 22 || curA < bt.start.att * 0.35) return endBattle(s, bt, 'def');
+      if (bt.base && bt.days < siegeMinDays(B(s, bt.base))) { var gb0 = B(s, bt.base); if (gb0.garrison < 5) gb0.garrison = 5; return; } // 籠城は防御に応じて数日は持ちこたえる（援軍が間に合うように）
       if (bt.base) { var gb = B(s, bt.base).garrison; if ((gb < 10 && (!bt.sides.def.length || mD < 22)) || curD < bt.start.def * 0.25) return endBattle(s, bt, 'att'); } // 籠城は守備兵が尽きるまで続く
       else if (bt.sides.def.length && (mD < 22 || curD < bt.start.def * 0.3)) return endBattle(s, bt, 'att');
       if (bt.base && bt.days > 25) return endBattle(s, bt, B(s, bt.base).garrison > 0 ? 'def' : 'att');
@@ -783,8 +810,8 @@
     var winIds = winner === 'att' ? bt.sides.att : bt.sides.def, loseIds = winner === 'att' ? bt.sides.def : bt.sides.att;
     var winF = winner === 'att' ? bt.attFaction : bt.defFaction, loseF = winner === 'att' ? bt.defFaction : bt.attFaction;
     var big = (bt.start.att + bt.start.def) >= 800 ? 1 : 0.4;
-    var honored = {}; winIds.forEach(function (id) { var a = s.armies[id]; if (!a) return; var cpx = s.corps[a.joinCorps || a.corps]; if (!cpx || !cpx.senjin || honored[cpx.id]) return; var rec = (cpx.contingents || []).filter(function (c) { return c.id === cpx.senjin && /joined/.test(c.decision); })[0]; if (!rec) return; honored[cpx.id] = 1; var rr0 = { kind: rec.kind, id: rec.id }; retAddLoyalty(s, rr0, cpx.faction, 8); addService(s, cpx.faction, rec.id, 2); news(s, '【先陣の功名】' + rec.name + 'は' + bt.name + 'で先陣を務め、名を上げた（忠誠が上がる。恩賞で報いること）', { type: 'military', important: true, factions: [cpx.faction] }); });
-    winIds.forEach(function (id) { var a = s.armies[id]; if (!a || !a.corps || !s.corps[a.corps]) return; (s.corps[a.corps].contingents || []).forEach(function (c) { if (/joined/.test(c.decision)) addService(s, s.corps[a.corps].faction, c.id, 3 * big); }); if (a.faction !== s.corps[a.corps].faction) addService(s, s.corps[a.corps].faction, a.faction, 3 * big); }); // 勝ち戦の奉公 [[winF, 1.5], [loseF, -2.5]].forEach(function (x) { var rf = x[0] && F(s, topLord(s, x[0])); if (rf && rf.regime) { rf.regime.cohesion = clamp(rf.regime.cohesion + x[1] * big, 0, 100); if (x[1] > 0 && rf.id === 'yoritomo') rf.regime.maturity = clamp(rf.regime.maturity + 0.3 * big, 0, 100); } }); // 勝てば家臣団がまとまる
+    var honored = {}; winIds.forEach(function (id) { var a = s.armies[id]; if (!a) return; var cpx = s.corps[a.joinCorps || a.corps]; if (!cpx || !cpx.senjin || honored[cpx.id]) return; var rec = (cpx.contingents || []).filter(function (c) { return c.id === cpx.senjin && /joined/.test(c.decision); })[0]; if (!rec) return; honored[cpx.id] = 1; var rr0 = { kind: rec.kind, id: rec.id }; var so = rec.kind === 'house' ? H(s, rec.id) : F(s, rec.id); if (so) so.senjinCount = (so.senjinCount || 0) + 1; retAddLoyalty(s, rr0, cpx.faction, 8); addService(s, cpx.faction, rec.id, 2); news(s, '【先陣の功名】' + rec.name + 'は' + bt.name + 'で先陣を務め、名を上げた（忠誠が上がる。恩賞で報いること）', { type: 'military', important: true, factions: [cpx.faction] }); });
+    var svcDone = {}; winIds.forEach(function (id) { var a = s.armies[id]; if (!a || !a.corps || !s.corps[a.corps]) return; var lordF = s.corps[a.corps].faction; (s.corps[a.corps].contingents || []).forEach(function (c) { if (/joined|volunteer/.test(c.decision) && !svcDone[c.id]) { svcDone[c.id] = 1; addService(s, lordF, c.id, 2 * big); } }); if (a.faction !== lordF && !svcDone[a.faction]) { svcDone[a.faction] = 1; addService(s, lordF, a.faction, 2 * big); } }); // 一つの合戦で一家につき一度 // 勝ち戦の奉公 [[winF, 1.5], [loseF, -2.5]].forEach(function (x) { var rf = x[0] && F(s, topLord(s, x[0])); if (rf && rf.regime) { rf.regime.cohesion = clamp(rf.regime.cohesion + x[1] * big, 0, 100); if (x[1] > 0 && rf.id === 'yoritomo') rf.regime.maturity = clamp(rf.regime.maturity + 0.3 * big, 0, 100); } }); // 勝てば家臣団がまとまる
     var dead = [], captured = [];
     // 敗者の指揮官の生死
     loseIds.forEach(function (id) {
@@ -807,30 +834,38 @@
           text: bb.name + 'を落とせず、味方は退いた（残る兵 約' + Math.round(rest) + '、士気は落ちている）。\n兵をどうするか決める。何もしなければ、退いた先でしばらく待機したのち館に戻る。',
           choices: [{ id: 'return', label: '館に戻して兵を休める（武士団に戻し、また出陣できる）' }, { id: 'retry', label: '兵を立て直して、もう一度攻める' }, { id: 'stay', label: 'その場で待機する' }] }); } }
     var capturedBase = null;
-    if (bt.base && winner === 'att' && s.playerFaction && sameCamp(s, winF, s.playerFaction)) {
-      var helpers = {}; winIds.forEach(function (id) { var a = s.armies[id]; if (!a) return; var cpx = s.corps[a.joinCorps || a.corps]; if (!cpx || cpx.faction !== s.playerFaction) return; (cpx.contingents || []).forEach(function (c) { if (/joined/.test(c.decision)) helpers[c.id] = c.name; }); if (a.lordOrder && a.lordOrder.lord === s.playerFaction) helpers[a.house || a.faction] = a.house ? H(s, a.house).name : fname(s, a.faction); });
-      var hk = Object.keys(helpers);
-      if (hk.length) stop(s, { key: 'rewards', base: bt.base, helpers: hk, title: '論功行賞：' + B(s, bt.base).name, text: B(s, bt.base).name + 'を落とした。働いた家：' + hk.map(function (k) { return helpers[k]; }).join('・') + '。\n働きに報いなければ、奉公が積もって不満になる。御恩・所領・没官領の処分は「恩賞」タブからいつでも行える。',
-        choices: [{ id: 'kanjo', label: '感状と引出物を配る（' + hk.length * 40 + '貫）' }, { id: 'kanjo_only', label: '感状だけ配る（銭はかからない）' }, { id: 'later', label: 'あとで恩賞を考える' }] });
-    }
+    var meritEv = null;
+    if (s.playerFaction && topLord(s, winF) === s.playerFaction) { var mr = battleMerit(s, bt, winner, s.playerFaction);
+      if (mr.length && mr.some(function (x) { return x.kind !== 'self'; })) { meritEv = mr; mr.forEach(function (x) { if ((x.kind === 'house' || x.kind === 'vassal') && !svcDone[x.id]) { svcDone[x.id] = 1; addService(s, s.playerFaction, x.id, 1 + Math.round(x.share / 25)); } }); } }
     if (bt.base && winner === 'att') {
-      var b = B(s, bt.base), old = b.owner; capturedBase = b;
+      var b = B(s, bt.base), old = b.owner; capturedBase = b; bt.oldOwner = old;
+      var tlW = topLord(s, winF); if (tlW !== winF && winIds.some(function (id) { return s.armies[id] && s.armies[id].faction === tlW; })) winF = tlW; // 主君の軍が加わった連合の勝ちは主君のもの
       b.owner = winF; conquerHoldings(s, b, old, winF); var w = s.armies[winIds[0]]; b.garrison = w ? Math.round(Math.min(w.troops * 0.15, 300)) : 50; if (w) { w.troops -= b.garrison; w.base = b.id; }
       // 拠点にいた人物
       var of = F(s, old);
       factionPersons(s, old).forEach(function (p) { if (p.location === b.id) { if (historyProtects(s, p, winF, old)) { var nb0 = factionBases(s, old).filter(function (x) { return x.id !== b.id; })[0]; p.location = nb0 ? nb0.id : null; return; } var r = rand(s) + (nonCombatant(p) ? 0.4 : 0) + (of && of.leader === p.id ? 0.25 : 0); if (r < 0.03) { killPerson(s, p, 'battle', b.name + '陥落時に討たれる'); dead.push(p.name); } else if (r < 0.3) { p.captiveOf = winF; p.location = null; captured.push(p.name); } else { var nb = factionBases(s, old)[0]; p.location = nb ? nb.id : null; } } });
       if (of && of.capital === b.id) { var rest = factionBases(s, old); of.capital = rest.length ? rest[0].id : null; }
+      if (of && of.alive && old !== s.playerFaction && old !== 'court' && of.type !== '寺社' && !factionBases(s, old).length) lastBaseFall(s, old, winF, b);
       if (bt.base === 'kofukuji' || bt.base === 'todaiji') nantoBurned(s, winF);
     }
     var lossTxt = '損害 攻' + Math.round(bt.losses.att) + '／守' + Math.round(bt.losses.def);
-    var txt = bt.name + '終結（' + bt.days + '日間）：' + fname(s, winF) + 'の勝利。' + lossTxt + (dead.length ? '。討死：' + dead.join('、') : '') + (captured.length ? '。捕虜：' + captured.join('、') : '') + (capturedBase ? '。' + capturedBase.name + 'が陥落' : '');
+    var coal = Object.keys(bt.init || {}).map(function (k) { var r = bt.init[k]; return r.side === winner ? (r.house || r.faction) : null; }).filter(function (x, i, a) { return x && a.indexOf(x) === i; }).length > 1;
+    var winLabel = coal && topLord(s, winF) !== winF ? fname(s, topLord(s, winF)).replace(/（.*）/, '') + '方（連合）' : coal ? fname(s, winF).replace(/（.*）/, '') + '方（連合）' : fname(s, winF);
+    var txt = bt.name + '終結（' + bt.days + '日間）：' + winLabel + 'の勝利。' + lossTxt + (dead.length ? '。討死：' + dead.join('、') : '') + (captured.length ? '。捕虜：' + captured.join('、') : '') + (capturedBase ? '。' + capturedBase.name + 'が陥落' : '');
     news(s, txt, { type: 'battle', important: true, factions: [winF, loseF], province: bt.province });
     s.battleHistory.push({ name: bt.name, date: dateStr(s), province: bt.province, winner: winF, loser: loseF, days: bt.days, start: bt.start, losses: { att: Math.round(bt.losses.att), def: Math.round(bt.losses.def) }, dead: dead, captured: captured, baseFallen: capturedBase ? capturedBase.id : null });
     // 名声・正当性
     var wf = F(s, winF), lf = F(s, loseF); if (wf) wf.legitimacy = clamp(wf.legitimacy + 3, 0, 100); if (lf) lf.legitimacy = clamp(lf.legitimacy - 3, 0, 100);
     broadcast(s, 'lastBattle', bt.province, null);
     s.flags.battlesWon = s.flags.battlesWon || {}; s.flags.battlesWon[winF] = (s.flags.battlesWon[winF] || 0) + 1;
-    if (involvesPlayer(s, winF) || involvesPlayer(s, loseF) || capturedBase) stop(s, { key: capturedBase ? 'base_fall' : 'battle_end', title: bt.name + ' 決着', place: PV(s, bt.province).name, text: txt, choices: [] });
+    var ownIn = s.playerFaction && (Object.keys(bt.init || {}).some(function (k) { return bt.init[k].faction === s.playerFaction; }) || bt.oldOwner === s.playerFaction || (bt.base && !capturedBase && B(s, bt.base) && B(s, bt.base).owner === s.playerFaction));
+    if (meritEv) {
+      var mt = meritEv.filter(function (x) { return x.kind !== 'self'; });
+      stop(s, { key: 'rewards', base: capturedBase ? capturedBase.id : null, province: bt.province, battle: bt.name, merit: meritEv, helpers: mt.map(function (x) { return x.id; }), given: {}, title: (capturedBase ? capturedBase.name + '攻め' : bt.name) + ' ― ' + winLabel + 'の勝利・論功行賞',
+        persons: mt.slice(0, 4).map(function (x) { return x.head; }).filter(Boolean),
+        text: txt + '\nともに戦った家の働きを順に並べた。上の家ほど働きが大きい。その場で恩賞を選んで与えられる（あとで「恩賞」タブからでもよい）。報いなければ奉公が積もって不満になる。',
+        choices: [{ id: 'done', label: '論功行賞を終える' }, { id: 'kanjo_all', label: '全家に感状を与えて終える' }, { id: 'later', label: 'あとで恩賞を考える' }] });
+    } else if (capturedBase && bt.oldOwner === s.playerFaction) stop(s, { key: capturedBase ? 'base_fall' : 'battle_end', title: bt.name + ' 決着', place: PV(s, bt.province).name, text: txt, choices: [] });
   }
 
   // ---- 退却命令：行軍中・交戦中の自軍を引かせる（交戦中は追撃で損害を受ける）
@@ -937,6 +972,7 @@
   // 毎月：体制の値が行動・事件によって動く
   function regimeTick(s) {
     ensureRegime(s);
+    var topInf = {}; Object.keys(s.provinces).forEach(function (p) { var i = provinceInfluence(s, p)[0]; topInf[p] = i ? topLord(s, i.faction) : null; }); // 国ごとの最有力（勢力ごとに数え直さない）
     Object.keys(s.factions).forEach(function (k) {
       var f = s.factions[k]; if (!f.alive || k === 'court') return; var r = f.regime, inst = f.institutions || {}, ld = Pn(s, f.leader);
       var ni = Object.keys(inst).length, vass = Object.keys(s.factions).filter(function (v) { return s.factions[v].alive && s.factions[v].overlord === k; }).length;
@@ -954,7 +990,7 @@
       // 家臣団結束度：勝ち負け（合戦の結果で直接動く）・恩賞・集中のしすぎ・内紛
       r.cohesion = clamp(r.cohesion + (55 - r.cohesion) * 0.02 - (r.central > 80 ? 0.4 : 0) - (f.flags.strifeUntil > s.day ? 0.8 : 0), 0, 100);
       // 地方統制力：地頭・問注所・支配国の不穏
-      var held = Object.keys(s.provinces).filter(function (p) { var i = provinceInfluence(s, p)[0]; return i && topLord(s, i.faction) === k; });
+      var held = Object.keys(s.provinces).filter(function (p) { return topInf[p] === k; });
       var unrest = held.length ? held.reduce(function (t, p) { return t + PV(s, p).unrest; }, 0) / held.length : 50;
       var locT = clamp(20 + r.maturity * 0.4 + Math.min(20, jito * 0.5) + (inst.monchujo ? 8 : 0) - (unrest - 20) * 0.5, 0, 100); r.local += (locT - r.local) * 0.06;
       var cb = (REGIME0[k] || {}).central || 50; r.central += ((cb + (f.flags.bakufu ? 10 : 0)) - r.central) * 0.02; // 権力の集中は元の体質へ少しずつ戻る
@@ -973,7 +1009,10 @@
     Object.keys(s.houses || {}).forEach(function (k) {
       var h = s.houses[k], f = F(s, h.faction); if (!f || !f.alive) { h.influence = 0; return; }
       var ms = h.members.map(function (m) { return Pn(s, m); }).filter(function (p) { return p && p.alive && topLord(s, p.faction || '') === topLord(s, h.faction); });
-      if (h.head && !alive(s, h.head) && ms.length) { h.head = ms.sort(function (a, b) { return (b.abilities.politics + b.abilities.command) - (a.abilities.politics + a.abilities.command); })[0].id; news(s, h.name + 'の家督は' + pname(s, h.head) + 'が継いだ', { type: 'politics', factions: [h.faction] }); }
+      var deadH = h.head && !alive(s, h.head) ? Pn(s, h.head) : null, brs = deadH ? branchHeads(s, k).filter(function (q) { return q && canLead(q) && (deadH.relations || []).some(function (r) { return r.person === q.id && /父子|兄弟/.test(r.type); }); }) : [];
+      var brH = !deadH ? null : (h.heir && brs.some(function (q) { return q.id === h.heir; })) ? Pn(s, h.heir) : (!ms.length && brs.length ? brs.sort(function (a, b) { return (b.abilities.politics + b.abilities.command) - (a.abilities.politics + a.abilities.command); })[0] : (brs.filter(function (q) { return ms.every(function (m) { return (q.abilities.politics + q.abilities.command) > (m.abilities.politics + m.abilities.command) + 20; }); })[0] || null)); // 分家の当主も一門として家督の候補
+      if (brH) { mergeBranch(s, brH, k); h.head = brH.id; news(s, h.name + 'の家督は' + brH.name + 'が継いだ（分家から本家へ）', { type: 'politics', important: true, factions: [h.faction] }); }
+      else if (h.head && !alive(s, h.head) && ms.length) { h.head = ms.sort(function (a, b) { return (b.abilities.politics + b.abilities.command) - (a.abilities.politics + a.abilities.command); })[0].id; news(s, h.name + 'の家督は' + pname(s, h.head) + 'が継いだ', { type: 'politics', factions: [h.faction] }); }
       var offices = ms.reduce(function (t, p) { return t + (p.courtOffices || []).length + (p.warriorOffices || []).length * 2; }, 0);
       var marriage = ms.some(function (p) { return (p.relations || []).some(function (r) { return /夫婦/.test(r.type) && (r.person === f.leader || r.person === f.heir); }); }) ? 12 : ms.some(function (p) { return (p.relations || []).some(function (r) { return /乳母/.test(r.type) && (r.person === f.leader || r.person === f.heir); }); }) ? 8 : 0;
       var cmdr = Math.min(6, ms.filter(function (p) { return /^army:/.test(String(p.location || '')); }).length * 2);
@@ -1169,9 +1208,9 @@
 
   // ---- 御恩（所領のほかに与えられるもの）：屋敷・引出物（馬・太刀）・感状・官途の推挙。先陣の名誉は出陣の際に任せる
   var BESTOW = {
-    yashiki: { label: '屋敷を与える', cost: 150, loy: 15, svc: 3, once: true, note: '本拠の近くに屋敷を構えさせる。出仕の場ができ、以後の参陣の呼びかけに応じやすくなる' },
+    yashiki: { label: '屋敷を与える', cost: 150, loy: 15, svc: 3, note: '味方の拠点の近くに屋敷を構えさせる（一人に幾つでも。二つ目からは忠誠+7）。出仕の場ができ、参陣に応じやすくなる。地図に「○○の屋敷」と出る' },
     gift: { label: '引出物（馬・太刀）', cost: 40, loy: 5, svc: 1, cool: 60, note: '名馬や太刀を贈る' },
-    kanjo: { label: '感状を与える', cost: 0, loy: 6, svc: 1, cool: 90, needSvc: true, note: '働きを書き付けて褒める。奉公（働き）があるときだけ' },
+    kanjo: { label: '感状を与える', cost: 0, loy: 6, svc: 3, needSvc: true, note: '働きを書き付けて褒める。奉公（働き）があるときだけ、何度でも与えられる（一度で奉公の未払いを3減らす）' },
     kanto: { label: '官途を推挙する', cost: 100, loy: 12, svc: 4, cool: 365, needCourt: true, note: '朝廷に任官を推薦する（左衛門尉・兵衛尉など）。朝廷との伝手（令旨・院宣・幕府・正統性50以上）が要る' }
   };
   var KANTO = ['左衛門尉', '右衛門尉', '左兵衛尉', '右兵衛尉', '馬允', '介'];
@@ -1179,6 +1218,400 @@
   // ---- 館を与える：家臣（人物）に与えれば独立した家（御家人）となり、自分の兵・蔵を持つ。家・御家人に与えれば本拠が増える
   var SURNAME2 = ['佐々木', '宇都宮', '小山田', '長谷川', '大河戸', '比企'];
   function surnameOf(name) { var sn = SURNAME2.filter(function (x) { return name.indexOf(x) === 0; })[0]; return sn || (name.length >= 4 ? name.slice(0, 2) : name.slice(0, 1)); }
+
+  // ---- 最後の拠点が落ちた家：一族は捕らえられ、勝った側が処遇を決める（家臣にする・斬首・解放・さらし首）
+  // ---- 合戦の働き：勝った側で主君（lord）の陣営に属する家・御家人・直臣の大将ごとに、出した兵・失った兵・先陣で点をつける
+  function battleMerit(s, bt, winner, lord) {
+    var g = {};
+    Object.keys(bt.init || {}).forEach(function (aid) { var r = bt.init[aid]; if (r.side !== winner) return; if (!F(s, r.faction) || topLord(s, r.faction) !== lord) return;
+      if ((r.house || r.faction !== lord) && r.lordOrdered !== lord) return; // 主君の指示（出陣の参陣・指図・迎撃）なしに自分で戦った家は恩賞を求めない
+      var a = s.armies[aid], fin = a ? a.troops : 0, lost = Math.max(0, r.t - fin), key, kind, name, head;
+      if (r.house && H(s, r.house) && !H(s, r.house).asFaction) { key = r.house; kind = 'house'; name = H(s, r.house).name; head = H(s, r.house).head; }
+      else if (r.faction !== lord) { key = r.faction; kind = 'vassal'; name = fname(s, r.faction).replace(/（.*）/, ''); head = F(s, r.faction).leader; }
+      else if (r.cmd && r.cmd !== F(s, lord).leader && alive(s, r.cmd)) { key = r.cmd; kind = 'person'; name = pname(s, r.cmd) + '（直臣）'; head = r.cmd; }
+      else { key = 'self'; kind = 'self'; name = fname(s, lord).replace(/（.*）/, '') + 'の直轄勢'; head = F(s, lord).leader; }
+      var x = g[key] = g[key] || { id: key, kind: kind, name: name, head: head, troops: 0, lost: 0, senjin: false, commanders: [] };
+      x.troops += r.t; x.lost += lost; if (r.senjin) x.senjin = true; if (r.cmd && x.commanders.indexOf(r.cmd) < 0) x.commanders.push(r.cmd); });
+    var arr = Object.keys(g).map(function (k) { var x = g[k]; var v = x.commanders.reduce(function (t, c) { var p = Pn(s, c); return Math.max(t, p ? p.abilities.valor : 0); }, 0);
+      x.score = Math.round((x.troops + x.lost * 3) * (x.senjin ? 1.3 : 1) * (1 + v / 400)); x.troops = Math.round(x.troops); x.lost = Math.round(x.lost); return x; });
+    var tot = arr.reduce(function (t, x) { return t + x.score; }, 0) || 1;
+    arr.forEach(function (x) { x.share = Math.round(x.score / tot * 100); });
+    arr.sort(function (a, b) { return b.score - a.score; }); arr.forEach(function (x, i) { x.rank = i + 1; });
+    return arr;
+  }
+  // ---- 恩賞を与える（論功行賞の場・恩賞タブ共通）：拠点・屋敷・感状・引出物・銭・兵・官途・守護・没官領
+  var REWARD_KINDS = { base: '攻め落とした拠点（館）', yashiki: '屋敷', kanjo: '感状', gift: '引出物（馬・太刀）', money: '銭', troops: '兵（直轄の兵を分ける）', kanto: '官途の推挙（官位・官職）', shugo: '守護職（役職）', spoil: '没官領（所領）' };
+  function giveReward(s, fid, cmd) {
+    var f = F(s, fid); if (!f) return { ok: false, reason: '勢力が不明' };
+    var kind = cmd.kind, tgt = cmd.target, r = retainersOf(s, fid).filter(function (x) { return x.id === tgt; })[0], p = !r ? Pn(s, tgt) : null;
+    if (!r && !(p && p.alive && p.faction === fid && p.id !== f.leader)) return { ok: false, reason: '自分に従う家・御家人・家臣を選ぶこと' };
+    var name = r ? retName(s, r) : p.name, res;
+    if (kind === 'base') res = grantBase(s, fid, { base: cmd.base, to: tgt, troops: Math.max(0, Math.floor(cmd.amount || 0)) });
+    else if (kind === 'yashiki') res = giveYashiki(s, fid, { target: tgt, base: cmd.base || f.capital });
+    else if (kind === 'kanjo' || kind === 'gift' || kind === 'kanto') res = bestow(s, fid, { kind: kind, target: tgt });
+    else if (kind === 'money') { var amt = Math.floor(cmd.amount || 0); if (amt < 50) return { ok: false, reason: '銭は50貫から' }; if (!r) return { ok: false, reason: '銭は家・御家人に与える' }; if (f.money < amt) return { ok: false, reason: '銭が足りない（' + amt + '貫）' };
+      f.money -= amt; if (r.kind === 'house') H(s, r.id).money = (H(s, r.id).money || 0) + amt; else F(s, r.id).money += amt;
+      retAddLoyalty(s, r, fid, Math.min(10, Math.round(amt / 50))); addService(s, fid, r.id, -Math.min(4, amt / 100)); if (r.kind === 'house') H(s, r.id).lastGrant = s.day;
+      news(s, '【御恩】' + name + 'に銭' + amt + '貫を与えた', { type: 'politics', factions: [fid] }); res = { ok: true, message: name + 'に銭' + amt + '貫を与えた。忠誠が上がった' }; }
+    else if (kind === 'troops') { var n = Math.floor(cmd.amount || 0); if (n < 20) return { ok: false, reason: '兵は20から' }; if (!r) return { ok: false, reason: '兵は家・御家人に与える' };
+      var home = r.kind === 'house' ? ((houseBands(s, r.id)[0] || {}).province || (H(s, r.id).seat && B(s, H(s, r.id).seat) ? B(s, H(s, r.id).seat).province : null)) : (B(s, F(s, r.id).capital) || {}).province;
+      if (!home) return { ok: false, reason: name + 'には兵を置く本領がない' };
+      var mine = Object.keys(s.bands).map(function (k) { return s.bands[k]; }).filter(function (b) { return b.faction === fid && !b.house && b.strength - b.mobilized > 0; }).sort(function (a, b) { return (a.province === home ? -1 : 0) - (b.province === home ? -1 : 0) || (b.strength - b.mobilized) - (a.strength - a.mobilized); });
+      var arms = Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (x) { return x.faction === fid && !x.house && !x.battleId && x.troops > 60; }); // 足りなければ戦の終わった直轄の軍勢から分ける
+      var have = mine.reduce(function (t, b) { return t + Math.floor(b.strength - b.mobilized); }, 0), haveA = arms.reduce(function (t, x) { return t + Math.floor(x.troops - 50); }, 0);
+      if (have + haveA < n) return { ok: false, reason: '分けられる直轄の兵が足りない（' + (have + haveA) + '）' };
+      var left = n; mine.forEach(function (b) { if (left <= 0) return; var k = Math.min(left, Math.floor(b.strength - b.mobilized)); b.strength -= k; b.base = Math.max(0, (b.base || 0) - k); left -= k; });
+      arms.forEach(function (x) { if (left <= 0) return; var k = Math.min(left, Math.floor(x.troops - 50)); x.troops -= k; x.initialTroops = Math.max(x.troops, (x.initialTroops || 0) - k); left -= k; });
+      var tb = r.kind === 'house' ? houseBands(s, r.id).filter(function (b) { return b.province === home; })[0] : Object.keys(s.bands).map(function (k) { return s.bands[k]; }).filter(function (b) { return b.faction === r.id && !b.house && b.province === home; })[0];
+      if (!tb) { var bid = 'band_rw_' + r.id + '_' + s.day; tb = s.bands[bid] = { id: bid, faction: r.kind === 'house' ? fid : r.id, house: r.kind === 'house' ? r.id : null, province: home, name: name + 'の兵', strength: 0, base: 0, mobilized: 0, confidence: 'ゲーム展開' }; }
+      tb.strength += n; tb.base = (tb.base || 0) + n; retAddLoyalty(s, r, fid, Math.min(8, Math.round(n / 50))); addService(s, fid, r.id, -Math.min(3, n / 100));
+      news(s, '【御恩】' + name + 'に兵' + n + 'を分け与えた', { type: 'politics', factions: [fid] }); res = { ok: true, message: name + 'に兵' + n + 'を分け与えた（' + PV(s, home).name + 'の武士団に加わる）' }; }
+    else if (kind === 'shugo') { if (!(f.flags || {}).bakufu) return { ok: false, reason: '守護職は幕府を開いてから任じられる' }; var pv = PV(s, cmd.province); if (!pv) return { ok: false, reason: '国を選ぶこと' };
+      var who = r ? Pn(s, r.kind === 'house' ? H(s, r.id).head : F(s, r.id).leader) : p; if (!who || !who.alive) return { ok: false, reason: '当主がいない' };
+      var t = pv.name + '守護'; if (Object.keys(s.persons).some(function (k) { var q = s.persons[k]; return q.alive && (q.warriorOffices || []).indexOf(t) >= 0; })) return { ok: false, reason: t + 'はすでにいる' };
+      who.warriorOffices = (who.warriorOffices || []).concat([t]); if (r) retAddLoyalty(s, r, fid, 10); else who.loyalty = clamp((who.loyalty || 60) + 10, 0, 100); if (r) addService(s, fid, r.id, -4);
+      news(s, '【幕府人事】' + who.name + 'を' + t + 'に任じた', { type: 'politics', factions: [fid] }); res = { ok: true, message: who.name + 'を' + t + 'に任じた' }; }
+    else if (kind === 'spoil') { if (!r) return { ok: false, reason: '所領は家・御家人に与える' }; res = decideSpoil(s, fid, cmd.holding, tgt); }
+    else return { ok: false, reason: '恩賞の種類が不明' };
+    if (res && res.ok && cmd.ev) { var ev = s.pendingStops.filter(function (e) { return e.id === cmd.ev; })[0]; if (ev) { ev.given = ev.given || {}; (ev.given[tgt] = ev.given[tgt] || []).push(REWARD_KINDS[kind].replace(/（.*）/, '') + (kind === 'money' ? cmd.amount + '貫' : kind === 'troops' ? cmd.amount : '')); } }
+    return res;
+  }
+  // ---- 敵軍の迎撃：地図の敵軍を選び、自軍・御家人・その両方（連合）を差し向ける。差し向けた軍は敵軍を追い続ける
+  function intercept(s, fid, cmd) {
+    var en = s.armies[cmd.enemy]; if (!en) return { ok: false, reason: '敵軍が見つからない' }; if (!atWar(s, fid, en.faction)) return { ok: false, reason: fname(s, en.faction) + 'とは交戦していない' };
+    var sent = [], refused = [], errs = [];
+    (cmd.armies || []).forEach(function (aid) { var a = s.armies[aid]; if (!a || a.faction !== fid) { errs.push('自軍でない軍勢'); return; } if (a.battleId) { errs.push(armyLabel(s, a) + 'は交戦中'); return; }
+      var e = setArmyTarget(s, a, { type: 'province', id: en.province }, 'attack'); if (e) { errs.push(armyLabel(s, a) + '：' + e); return; } a.chase = en.id; a.chaseUntil = s.day + 60; if (a.status === 'gathering') a.status = a.path.length ? 'marching' : 'arrived'; sent.push(armyLabel(s, a)); });
+    (cmd.vassals || []).forEach(function (vid) { var r = orderRetainer(s, fid, { vassal: vid, act: 'intercept', enemy: en.id }); if (!r.ok) errs.push(r.reason); else if (r.refused) refused.push(r.message); else sent.push(r.message); });
+    if (!sent.length && !refused.length) return { ok: false, reason: errs[0] || '差し向ける軍勢を選ぶこと' };
+    var msg = armyLabel(s, en) + 'の迎撃：' + (sent.length ? sent.join('／') : '応じた軍はない') + (refused.length ? '。断り：' + refused.join('／') : '') + (errs.length ? '。（' + errs.join('、') + '）' : '');
+    news(s, '【迎撃】' + msg, { type: 'military', important: true, factions: [fid, en.faction], province: en.province });
+    return { ok: true, message: msg };
+  }
+  function chaseTick(s) {
+    Object.keys(s.armies).forEach(function (k) { var a = s.armies[k]; if (!a || !a.chase) return; var en = s.armies[a.chase];
+      if (!en || en.troops <= 0 || !atWar(s, a.faction, en.faction) || (a.chaseUntil != null && s.day > a.chaseUntil)) { if (!en || en.troops <= 0) { a.chaseDone = true; news(s, armyLabel(s, a) + 'は追っていた敵軍を退けた', { type: 'military', factions: [a.faction] }); } a.chase = null; if (a.status !== 'battle') a.mission = 'idle'; return; }
+      if (a.battleId || a.status === 'gathering' || a.status === 'retreating') return;
+      if (en.retreatTo && en.status === 'retreating' && a.province === en.province) return;
+      var dest = a.target && a.target.type === 'province' ? a.target.id : null; if (dest !== en.province) setArmyTarget(s, a, { type: 'province', id: en.province }, 'attack');
+    });
+    // 滅んだ家の兵は散る。拠点を持たない家の小勢（150未満）も日ごとに散っていく
+    Object.keys(s.armies).forEach(function (k) { var a = s.armies[k]; if (!a) return; var f = F(s, a.faction);
+      if (!f || !f.alive) { news(s, armyLabel(s, a) + 'は主家が滅び、散り散りになった', { type: 'military', factions: [a.faction], province: a.province }); delete s.armies[k]; return; }
+      if (a.battleId || a.faction === s.playerFaction || factionBases(s, a.faction).length || a.troops >= 150) return;
+      a.troops = Math.max(0, a.troops * 0.97 - 1); if (a.troops < 20) { news(s, armyLabel(s, a) + 'は拠り所を失って四散した', { type: 'military', factions: [a.faction], province: a.province }); delete s.armies[k]; } });
+  }
+  // ================================================================ v2.8：寺社の建立・開墾・委任・役職の自立・軍勢の合流・兵火
+  // ---- 寺社の建立：朝廷の許し（勅許）を得てから、氏寺・氏社を建てる
+  function templePermit(s, fid) {
+    var f = F(s, fid); if (!f) return { ok: false, reason: '勢力が不明' };
+    if (f.permitTry != null && s.day - f.permitTry < 60) return { ok: false, reason: '朝廷への願い出は60日に一度（あと' + (60 - (s.day - f.permitTry)) + '日）' };
+    var cost = 200; if (f.money < cost) return { ok: false, reason: '銭が足りない（願い出の献上に200貫）' };
+    f.money -= cost; f.permitTry = s.day; ensureCourt(s);
+    var sup = courtSupport(s, fid), rel0 = (rel(s, fid, 'court') || {}).value || 0, cr = f.courtRelation || 0;
+    var p = clamp(0.35 + sup * 0.35 + cr / 200 + rel0 / 300 + ((f.flags || {}).bakufu ? 0.15 : 0) + (f.legitimacy || 0) / 400 - (atWar(s, fid, 'court') ? 0.6 : 0), 0.05, 0.92);
+    if (rand(s) < p) { f.templePermits = (f.templePermits || 0) + 1; f.courtRelation = clamp(cr + 3, -100, 100);
+      news(s, '【勅許】朝廷が' + f.name + 'に寺社の建立を許した', { type: 'court', important: fid === s.playerFaction, factions: [fid] });
+      return { ok: true, message: '朝廷の許し（勅許）を得た。普請で「寺社」を一つ建てられる（許し ' + f.templePermits + '）' }; }
+    news(s, '朝廷は' + f.name + 'の寺社建立の願いを退けた', { type: 'court', factions: [fid] });
+    return { ok: true, message: '朝廷は願いを退けた（献上の200貫は戻らない）。朝廷での支持や朝廷との関係を深めてから、60日後にまた願い出られる', refusedPermit: true };
+  }
+  function templeTick(s) { // 自ら建てた寺社：毎月、大義（正統性）が少し上がり、その国の不穏が鎮まる。焼けていれば効かない
+    Object.keys(s.bases).forEach(function (k) { var b = s.bases[k]; if (b.type !== '寺社' || !b.built || b.burned) return; var f = F(s, b.owner); if (!f || !f.alive) return;
+      f.legitimacy = clamp((f.legitimacy || 0) + 0.5, 0, 100); var pv = PV(s, b.province); if (pv) pv.unrest = clamp(pv.unrest - 2, 0, 100); });
+  }
+  // ---- 開墾（新田開発）：所領のある国で荒れ地を開き、新しい私領を得る。兵を集められる上限（石高から決まる）が増える
+  function kaikon(s, fid, cmd) {
+    var f = F(s, fid), pv = PV(s, cmd.province); if (!f || !pv) return { ok: false, reason: '国を選ぶこと' };
+    var mine = Object.keys(s.holdings).some(function (k) { var h = s.holdings[k]; return h.province === pv.id && h.controller === fid; }) || Object.keys(s.bases).some(function (k) { return s.bases[k].province === pv.id && s.bases[k].owner === fid; });
+    if (!mine) return { ok: false, reason: pv.name + 'に自分の所領・拠点がない' };
+    s.kaikon = s.kaikon || []; if (s.kaikon.some(function (x) { return x.faction === fid && x.province === pv.id; })) return { ok: false, reason: pv.name + 'ではすでに開墾を進めている' };
+    if ((pv.kaikonDone || {})[fid] >= 3) return { ok: false, reason: pv.name + 'ではもう開ける土地が少ない（3度まで）' };
+    if (s.kaikon.filter(function (x) { return x.faction === fid; }).length >= 3) return { ok: false, reason: '同時に進められる開墾は3か所まで' };
+    var cost = 300, food = 300; if (f.money < cost || f.food < food) return { ok: false, reason: '開墾には銭300貫・兵糧300石が要る' };
+    f.money -= cost; f.food -= food; var days = 150;
+    s.kaikon.push({ faction: fid, province: pv.id, start: s.day, progress: 0, need: days, by: cmd.by || null });
+    news(s, '【開墾】' + f.name + 'が' + pv.name + 'で荒れ地の開発を始めた' + (cmd.by ? '（' + pname(s, cmd.by) + 'の差配）' : ''), { type: 'build', factions: [fid], province: pv.id });
+    return { ok: true, message: pv.name + 'で開墾を始めた（銭300貫・兵糧300石。約' + Math.round(days / laborRate(s, pv.id)) + '日。終われば新しい私領ができ、その国で集められる兵の上限が増える）' };
+  }
+  function kaikonTick(s) {
+    (s.kaikon || []).slice().forEach(function (x) { var f = F(s, x.faction), pv = PV(s, x.province); if (!f || !f.alive) { s.kaikon.splice(s.kaikon.indexOf(x), 1); return; }
+      if (provinceArmies(s, x.province).some(function (a) { return atWar(s, a.faction, x.faction); })) return; x.progress += laborRate(s, x.province);
+      if (x.progress < x.need) return; s.kaikon.splice(s.kaikon.indexOf(x), 1);
+      pv.kaikonDone = pv.kaikonDone || {}; var n = pv.kaikonDone[x.faction] = (pv.kaikonDone[x.faction] || 0) + 1;
+      var hid = 'kaikon_' + x.faction + '_' + x.province + '_' + n; var out = 1800 + Math.round(rand(s) * 600);
+      s.holdings[hid] = { id: hid, name: pv.name + 'の新田（開発' + n + '）', province: x.province, type: '私領', proprietor: '—', controller: x.faction, output: out, confidence: 'ゲーム展開', note: dateStr(s) + 'に開墾', rights: { honjo: null, taxHolder: x.faction, jito: null }, oryo: false };
+      Object.keys(s.holdings).forEach(function (k) { var h = s.holdings[k]; if (h.province === x.province && h.controller === x.faction && k !== hid) h.output = Math.round(h.output * 1.05); });
+      news(s, '【開墾成る】' + pv.name + 'の新田（石高' + out + '）が開けた。' + f.name.replace(/（.*）/, '') + 'の所領となり、集められる兵が増えた', { type: 'build', important: x.faction === s.playerFaction, factions: [x.faction], province: x.province });
+    });
+  }
+  // ---- 委任：プレイヤーが方針を決め、裏で自動で行う（徴兵・恩賞・開墾・修復・論功行賞・拠点の守り）
+  var DELEGATE = { recruit: '徴兵（兵が上限に満たない国で集める）', rewards: '恩賞（奉公のたまった家に感状・引出物）', kaikon: '開墾（銭に余裕があれば所領の国で）', repair: '修復（焼けた館・屋敷を直す）', ronko: '論功行賞（全家に感状を与えて終える）', defense: '守り（拠点が攻められたら近くの軍・御家人を差し向ける）' };
+  function setDelegate(s, fid, cmd) {
+    s.delegate = s.delegate || {}; var d = s.delegate[fid] = s.delegate[fid] || { keep: 500 };
+    if (cmd.key && DELEGATE[cmd.key]) d[cmd.key] = !!cmd.on; if (cmd.keep != null) d.keep = Math.max(0, Math.round(cmd.keep));
+    return { ok: true, message: '委任：' + Object.keys(DELEGATE).filter(function (k) { return d[k]; }).map(function (k) { return DELEGATE[k].replace(/（.*）/, ''); }).join('・') + '（手元に残す銭 ' + d.keep + '貫）' };
+  }
+  function delegateTick(s) {
+    var fid = s.playerFaction, d = s.delegate && s.delegate[fid], f = F(s, fid); if (!d || !f || !f.alive) return;
+    var spare = function () { return f.money - (d.keep || 0); }, done = [];
+    if (d.ronko) s.pendingStops.forEach(function (e) { if (!e.resolved && e.key === 'rewards') { resolveEvent(s, e.id, 'kanjo_all'); done.push('論功行賞'); } });
+    if (d.defense) s.pendingStops.forEach(function (e) { if (e.resolved || e.key !== 'base_attacked') return; var b = B(s, e.base), bt = s.battles[e.battle]; resolveEvent(s, e.id, 'ok');
+      if (!b || !bt) return; var en = bt.sides.att.map(function (id) { return s.armies[id]; }).filter(Boolean).sort(function (x, y) { return y.troops - x.troops; })[0];
+      var mine = Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return a.faction === fid && !a.battleId && a.mission !== 'guard' && distProv(s, a.province, b.province) <= 150; }).slice(0, 2);
+      mine.forEach(function (a) { setArmyTarget(s, a, { type: 'base', id: b.id }, 'move'); });
+      var vs = retainersOf(s, fid).filter(function (r) { var home = r.kind === 'house' ? (houseBands(s, r.id)[0] || {}).province : (B(s, F(s, r.id).capital) || {}).province; return home && distProv(s, home, b.province) <= 120 && retLoyalty(s, r, fid) >= 55; }).slice(0, 2);
+      if (en) vs.forEach(function (r) { orderRetainer(s, fid, { vassal: r.id, act: 'intercept', enemy: en.id }); });
+      done.push(b.name + 'の救援（自軍' + mine.length + '・御家人' + vs.length + '）'); });
+    if (s.date.d === 1) {
+      if (d.rewards) retainersOf(s, fid).forEach(function (r) { var sv = serviceOf(s, fid, r.id); if (sv >= 3) { if (bestow(s, fid, { kind: 'kanjo', target: r.id }).ok) done.push(retName(s, r) + 'に感状'); if (sv >= 7 && spare() > 60) { if (bestow(s, fid, { kind: 'gift', target: r.id }).ok) done.push(retName(s, r) + 'に引出物'); } } });
+      if (d.recruit) Object.keys(s.provinces).forEach(function (p) { if (spare() < 100) return; var ri = recruitInfo(s, fid, p); if (ri.cap > 0 && ri.room >= 40) { var amt = Math.min(ri.room, Math.floor(spare() / 0.6 * 0.5)); if (amt >= 40 && recruit(s, fid, p, amt).ok) done.push(PV(s, p).name + 'で徴兵' + amt); } });
+      if (d.kaikon && spare() > 600 && !(s.kaikon || []).some(function (x) { return x.faction === fid; })) { var bestP = Object.keys(s.provinces).map(function (p) { return { p: p, n: Object.keys(s.holdings).filter(function (k) { return s.holdings[k].province === p && s.holdings[k].controller === fid; }).length }; }).filter(function (x) { return x.n && ((PV(s, x.p).kaikonDone || {})[fid] || 0) < 3; }).sort(function (a, b) { return b.n - a.n; })[0];
+        if (bestP && kaikon(s, fid, { province: bestP.p }).ok) done.push(PV(s, bestP.p).name + 'で開墾'); }
+      if (d.repair) { Object.keys(s.bases).forEach(function (k) { var b = s.bases[k]; if (b.burned && b.owner === fid && spare() > 150 && repairBase(s, fid, { base: k }).ok) done.push(b.name + 'の修復'); });
+        ensureYashiki(s).forEach(function (y) { if (y.burned && spare() > 80 && Pn(s, y.person) && topLord(s, Pn(s, y.person).faction) === fid && repairBase(s, fid, { yashiki: y.id }).ok) done.push(y.name + 'の修復'); }); }
+    }
+    if (done.length) news(s, '【委任】' + done.join('、'), { type: 'politics', factions: [fid] });
+  }
+  // ---- 役職の自立：侍所・政所（公文所）・問注所の長や執権は、その権限を自ら使う。忠誠の高い者は主君に伺いを立てるが、独断もある
+  var OFFICE_ACTS = { samurai_dokoro: '侍所', kumonjo: '公文所', mandokoro: '政所', monchujo: '問注所' };
+  function officeAct(s, lord, pid, office, act, arg, decided) { // 実際に行う
+    var p = Pn(s, pid), lf = F(s, lord), msg = '';
+    if (act === 'kanjo') { var r = bestow(s, lord, { kind: 'kanjo', target: arg }); if (!r.ok) return null; msg = (OFFICE_ACTS[office] || '幕府') + 'の' + p.name + 'が' + retName(s, { kind: H(s, arg) && !H(s, arg).asFaction ? 'house' : 'vassal', id: arg }) + 'に感状を与えた'; }
+    else if (act === 'tax') { var v = 40 + Math.round(p.abilities.politics * 1.5); lf.money += v; msg = (OFFICE_ACTS[office] || '政所') + 'の' + p.name + 'が年貢・公事を取り立て、' + v + '貫を納めた'; }
+    else if (act === 'kaikon') { var r2 = kaikon(s, lord, { province: arg, by: pid }); if (!r2.ok) return null; msg = (OFFICE_ACTS[office] || '政所') + 'の' + p.name + 'が' + PV(s, arg).name + 'の開墾を始めた（主君の銭300貫）'; }
+    else if (act === 'settle') { var a = arg[0], b = arg[1]; var P = ensurePolitics(s); P.grudge[a + '>' + b] = Math.max(0, (P.grudge[a + '>' + b] || 0) - 20); P.grudge[b + '>' + a] = Math.max(0, (P.grudge[b + '>' + a] || 0) - 20);
+      [a, b].forEach(function (x) { var rr0 = retainersOf(s, lord).filter(function (r) { return r.id === x; })[0]; if (rr0) retAddLoyalty(s, rr0, lord, 2); }); msg = '問注所の' + p.name + 'が' + pdisp(s, a) + 'と' + pdisp(s, b) + 'の所領争いを裁き、恨みを和らげた'; }
+    else if (act === 'favor') { var r3 = decideSpoil(s, lord, arg.holding, arg.to); if (!r3.ok) return null; msg = '執権の' + p.name + 'が没官領「' + s.holdings[arg.holding].name + '」を' + pdisp(s, arg.to) + 'に与えた'; }
+    else return null;
+    var hk = houseOfPerson(s, pid); if (s.shogunate && hk) s.shogunate.inf[hk] = (s.shogunate.inf[hk] || 0) + 1; // 権限を使うほど家の影響力が増す
+    news(s, (decided ? '【幕府の政務】' : '【独断】') + msg, { type: 'politics', important: lord === s.playerFaction && !decided, factions: [lord] });
+    return msg;
+  }
+  function pdisp(s, id) { var o = H(s, id) && !H(s, id).asFaction ? H(s, id) : F(s, id); return o ? o.name.replace(/（.*）/, '') : id; }
+  function officeTick(s) {
+    var lord = shogunId(s); if (!lord) return; var lf = F(s, lord), inst = lf.institutions || {}, sg = ensureShogunate(s);
+    var heads = [];
+    Object.keys(OFFICE_ACTS).forEach(function (k) { if (inst[k] && inst[k].head && alive(s, inst[k].head)) heads.push({ office: k, pid: inst[k].head }); });
+    if (sg.shikken && sg.shikken.holder) { var rp = repOf(s, sg.shikken.holder); if (rp && alive(s, rp.id || rp)) heads.push({ office: 'shikken', pid: rp.id || rp, house: sg.shikken.holder }); }
+    heads.forEach(function (hd) {
+      var p = Pn(s, hd.pid); if (!p || p.id === lf.leader || (s.playerFaction && (p.id === (repOf(s, s.playerFaction) || {}).id || topLord(s, p.faction) !== lord))) return;
+      if (s.playerFaction && houseOfPerson(s, p.id) === s.playerFaction) return; // プレイヤー自身の家の者は自分で動かす
+      if (rand(s) > 0.25 + p.ambition / 400) return;
+      var act = null, arg = null, rets = retainersOf(s, lord);
+      if (hd.office === 'samurai_dokoro') { var best = rets.filter(function (r) { return serviceOf(s, lord, r.id) >= 3; }).sort(function (a, b) { return serviceOf(s, lord, b.id) - serviceOf(s, lord, a.id); })[0]; if (best) { act = 'kanjo'; arg = best.id; } }
+      else if (hd.office === 'kumonjo' || hd.office === 'mandokoro') { if (lf.money > 1500 && rand(s) < 0.4) { var kp = Object.keys(s.provinces).filter(function (q) { return Object.keys(s.holdings).some(function (k) { return s.holdings[k].province === q && s.holdings[k].controller === lord; }) && ((PV(s, q).kaikonDone || {})[lord] || 0) < 3 && !(s.kaikon || []).some(function (x) { return x.faction === lord && x.province === q; }); })[0]; if (kp) { act = 'kaikon'; arg = kp; } } if (!act) act = 'tax'; }
+      else if (hd.office === 'monchujo') { var P = ensurePolitics(s), pairs = Object.keys(P.grudge).filter(function (k) { return P.grudge[k] >= 20; }).map(function (k) { return k.split('>'); }); if (pairs.length) { act = 'settle'; arg = pairs[0]; } }
+      else if (hd.office === 'shikken') { var sp = pendingSpoils(s, lord)[0]; if (sp) { act = 'favor'; arg = { holding: sp.holding, to: hd.house }; } else { var b2 = rets.filter(function (r) { return serviceOf(s, lord, r.id) >= 3 && (sg.ties[hd.house + '|' + r.id] || sg.ties[r.id + '|' + hd.house] || 0) > 0; })[0] || rets.filter(function (r) { return serviceOf(s, lord, r.id) >= 3; })[0]; if (b2) { act = 'kanjo'; arg = b2.id; } } }
+      if (!act) return;
+      var asks = lord === s.playerFaction && hd.office !== 'shikken' && (p.loyalty == null ? 60 : p.loyalty) >= 70 && rand(s) < 0.8; // 忠義の者は伺いを立てる（執権はたいてい独断）
+      if (asks) { if (s.pendingStops.some(function (e) { return e.key === 'office_request' && !e.resolved && e.person === p.id; })) return;
+        var what = { kanjo: pdisp(s, arg) + 'に感状を与えたい', tax: '年貢・公事を取り立てたい', kaikon: (arg && PV(s, arg) ? PV(s, arg).name : '') + 'で開墾を始めたい（銭300貫）', settle: arg ? pdisp(s, arg[0]) + 'と' + pdisp(s, arg[1]) + 'の争いを裁きたい' : '', favor: '' }[act];
+        stop(s, { key: 'office_request', person: p.id, office: hd.office, act: act, arg: arg, title: (OFFICE_ACTS[hd.office] || '執権') + 'の' + p.name + 'の伺い', persons: [p.id], text: p.name + '（' + (OFFICE_ACTS[hd.office] || '執権') + '）が伺いを立ててきた。「' + what + '」', choices: [{ id: 'yes', label: '許す' }, { id: 'no', label: '許さない' }] });
+        return; }
+      var m = officeAct(s, lord, p.id, hd.office, act, arg, false);
+      if (m && lord === s.playerFaction && rand(s) < 0.5) { var hk = houseOfPerson(s, p.id); if (hk && s.shogunate) grudgeAll(s, hk, 2, '独断'); } // 独断は周りの反感を少し買う
+    });
+  }
+  function resolveOfficeRequest(s, ev, choiceId) {
+    var p = Pn(s, ev.person); if (!p || !p.alive) return 'その人はもういない';
+    if (choiceId === 'no') { p.loyalty = clamp((p.loyalty == null ? 60 : p.loyalty) - 3, 0, 100); return p.name + 'の伺いを退けた（少し不満）'; }
+    var m = officeAct(s, s.playerFaction, p.id, ev.office, ev.act, ev.arg, true); p.loyalty = clamp((p.loyalty == null ? 60 : p.loyalty) + 1, 0, 100);
+    return m || '状況が変わって、行えなかった';
+  }
+  // ---- 軍勢の合流：同じ国にいて行き先が同じ御家人・家の軍は一つの部隊として動く。名は序列の高い家の大将「○○ 他N」
+  function mergeTick(s) {
+    var lord = s.playerFaction; if (!lord) return; var rank = {};
+    var groups = {};
+    Object.keys(s.armies).forEach(function (k) { var a = s.armies[k]; if (topLord(s, a.faction) !== lord || (!a.house && a.faction === lord)) return;
+      if (a.battleId || a.mission === 'guard' || a.status === 'retreating' || !a.target) { a.follow = null; return; }
+      var key = a.province + '|' + a.target.type + ':' + a.target.id + '|' + (a.edge ? a.edge.to : '');
+      (groups[key] = groups[key] || []).push(a); });
+    Object.keys(s.armies).forEach(function (k) { s.armies[k].followers = null; });
+    var rk = null;
+    Object.keys(groups).forEach(function (key) { var g = groups[key]; if (g.length < 2) { g.forEach(function (a) { a.follow = null; }); return; }
+      if (!rk) { rk = {}; gokeninRanking(s, lord).forEach(function (x) { rk[x.id] = x.score; }); }
+      g.sort(function (a, b) { return (rk[b.house || b.faction] || 0) - (rk[a.house || a.faction] || 0) || b.troops - a.troops; });
+      var L = g[0]; L.follow = null; L.followers = g.slice(1).map(function (a) { return a.id; });
+      g.slice(1).forEach(function (a) { if (a.follow !== L.id) news(s, armyLabel(s, a) + 'は' + armyLabel(s, L) + 'に合流して進む', { type: 'military', factions: [a.faction], province: a.province }); a.follow = L.id; a.edge = L.edge ? JSON.parse(JSON.stringify(L.edge)) : null; a.path = L.path.slice(); });
+    });
+  }
+  function groupLabel(s, a) { var fl = (a.followers || []).filter(function (id) { return s.armies[id]; }); if (!fl.length) return armyLabel(s, a); var tot = fl.reduce(function (t, id) { return t + s.armies[id].troops; }, a.troops);
+    return (a.commander ? pname(s, a.commander) : fname(s, a.faction)) + ' 他' + fl.length + '（' + Math.round(tot) + '）'; }
+  // ---- 兵火：大軍が拠点を攻めると火が放たれ、数日燃え続ける。その国の館・屋敷が焼け、修復が要る
+  function fireCheck(s, bt) {
+    if (!bt.base || bt.fireDone) return; var b = B(s, bt.base); if (!b) return;
+    var tot = bt.sides.att.concat(bt.sides.def).reduce(function (t, id) { return t + (s.armies[id] ? s.armies[id].troops : 0); }, 0) + b.garrison;
+    if (tot < 2000 || bt.days !== 3) return; // 大軍の攻防が3日目に入ったとき一度だけ火の手が上がるか決まる
+    var dense = Object.keys(s.bases).filter(function (k) { return s.bases[k].province === b.province; }).length + ensureYashiki(s).filter(function (y) { return B(s, y.base) && B(s, y.base).province === b.province; }).length / 2;
+    var p = 0.1 + Math.min(0.15, tot / 30000) + Math.min(0.15, dense * 0.03) + (b.type === '都' ? 0.15 : 0);
+    if (rand(s) >= p) return;
+    bt.fireDone = true; s.fires = s.fires || [];
+    var days = 2 + Math.floor(rand(s) * 3); s.fires.push({ id: nid(s, 'fire'), province: b.province, base: b.id, start: s.day, until: s.day + days, x: b.x, y: b.y });
+    news(s, '【兵火】' + b.name + 'の攻防で火が放たれ、炎が辺り一帯に燃え広がった（' + days + '日ほど燃え続ける）', { type: 'battle', important: true, province: b.province, factions: [b.owner] });
+  }
+  function fireTick(s) {
+    (s.fires || []).slice().forEach(function (fr) {
+      if (s.day > fr.until) { s.fires.splice(s.fires.indexOf(fr), 1); news(s, PV(s, fr.province).name + 'の火はようやく鎮まった', { type: 'battle', province: fr.province }); return; }
+      Object.keys(s.bases).forEach(function (k) { var b = s.bases[k]; if (b.province !== fr.province || b.type === '都') return; var near = Math.hypot(b.x - fr.x, b.y - fr.y) < 14 || k === fr.base; if (!near) return;
+        var was = b.burned; b.defense = Math.max(1, Math.round(b.defense - b.maxDefense * 0.2)); b.garrison = Math.max(0, Math.round(b.garrison * 0.95)); b.burned = true;
+        if (!was) { news(s, '【焼失】' + b.name + 'が焼け落ちた（守りが下がる。修復が要る）', { type: 'battle', important: involvesPlayer(s, b.owner), province: b.province, factions: [b.owner] }); } });
+      ensureYashiki(s).forEach(function (y) { var yb = B(s, y.base); if (!yb || yb.province !== fr.province || y.burned) return; if (Math.hypot(yb.x - fr.x, yb.y - fr.y) >= 14 && y.base !== fr.base) return;
+        if (rand(s) < 0.6) { y.burned = true; news(s, '【焼失】' + y.name + 'が焼け落ちた', { type: 'battle', province: yb.province }); } });
+      var pv = PV(s, fr.province); pv.devastation = clamp(pv.devastation + 2, 0, 100);
+      Object.keys(s.battles).forEach(function (k) { var bt = s.battles[k]; if (bt.province !== fr.province) return; bt.sides.att.concat(bt.sides.def).forEach(function (id) { var a = s.armies[id]; if (a) { a.troops *= 0.985; a.morale = Math.max(10, a.morale - 2); } }); });
+    });
+  }
+  function repairBase(s, fid, cmd) {
+    var f = F(s, fid); if (!f) return { ok: false, reason: '勢力が不明' };
+    if (cmd.yashiki) { var y = ensureYashiki(s).filter(function (x) { return x.id === cmd.yashiki; })[0]; if (!y || !y.burned) return { ok: false, reason: '焼けた屋敷を選ぶこと' }; if (f.money < 80) return { ok: false, reason: '屋敷の修復に80貫' };
+      f.money -= 80; y.burned = false; news(s, y.name + 'を建て直した', { type: 'build', factions: [fid] }); return { ok: true, message: y.name + 'を建て直した（80貫）' }; }
+    var b = B(s, cmd.base); if (!b || !b.burned) return { ok: false, reason: '焼けた拠点を選ぶこと' }; if (!b.owner || topLord(s, b.owner) !== topLord(s, fid)) return { ok: false, reason: '味方の拠点だけ修復できる' };
+    if (Object.keys(s.battles).some(function (k) { return s.battles[k].base === b.id; })) return { ok: false, reason: '合戦の最中は直せない' };
+    var cost = 60 + Math.round(b.maxDefense * 6); if (f.money < cost) return { ok: false, reason: '修復に' + cost + '貫が要る' };
+    f.money -= cost; b.burned = false; b.defense = Math.max(b.defense, Math.round(b.maxDefense * 0.5)); // 残りは日ごとに戻る
+    news(s, '【修復】' + b.name + 'の普請をやり直した', { type: 'build', factions: [fid], province: b.province }); return { ok: true, message: b.name + 'を修復した（' + cost + '貫。守りは日ごとに戻る）' };
+  }
+  // ---- 自軍・参陣の軍への命令：館に帰らせる（近くの味方の拠点へ戻って解散）、参陣の家を帰す
+  function returnHome(s, fid, cmd) {
+    var a = s.armies[cmd.army]; if (!a) return { ok: false, reason: '軍勢が見つからない' };
+    var mine = a.faction === fid, cp = s.corps[a.corps], contingent = !mine || a.house;
+    if (!mine && !(topLord(s, a.faction) === fid && (a.contingentOf === fid || (cp && cp.faction === fid) || (a.lordOrder && a.lordOrder.lord === fid)))) return { ok: false, reason: '自軍か、参陣している家の軍を選ぶこと' };
+    if (a.battleId) return { ok: false, reason: '交戦中は帰せない（退却を使う）' };
+    if (contingent && !mine || cmd.release) { var lab = armyLabel(s, a); a.corps = null; a.joinCorps = null; a.lordOrder = null; a.chase = null; disbandArmy(s, a, 'release'); news(s, lab + 'は陣を払って本領へ帰った', { type: 'military', factions: [a.faction] }); return { ok: true, message: lab + 'を帰した（兵は本領の武士団に戻る）' }; }
+    var bs = Object.keys(s.bases).map(function (k) { return s.bases[k]; }).filter(function (b) { return b.owner === fid || (b.owner && sameCamp(s, b.owner, fid) && b.house && H(s, b.house) && H(s, b.house).faction === fid); }).sort(function (x, y) { return distProv(s, a.province, x.province) - distProv(s, a.province, y.province); });
+    var hb = bs[0]; if (!hb) return { ok: false, reason: '戻る館がない' };
+    if (hb.province === a.province) { var lab2 = armyLabel(s, a); disbandArmy(s, a, 'garrison'); return { ok: true, message: lab2 + 'は' + hb.name + 'に戻って兵を休ませた' }; }
+    var e = setArmyTarget(s, a, { type: 'base', id: hb.id }, 'move'); if (e) return { ok: false, reason: e }; a.withdrawHome = true; a.corps = null; a.chase = null; a.mission = 'move';
+    return { ok: true, message: armyLabel(s, a) + 'を' + hb.name + 'へ帰らせる（着いたら兵を休ませる）' };
+  }
+  // ---- 一門の分家：館を与えて独立した家（分家）は一門のまま。本家の家督を継ぐことができ、継げば分家は本家に戻る
+  function rootOf(s, id) { var seen = {}, x = id; while (x && !seen[x]) { seen[x] = 1; var h = H(s, x); if (h && h.parent) x = h.parent; else break; } return x; }
+  function branchHeads(s, mainId) { return Object.keys(s.houses || {}).map(function (k) { return s.houses[k]; }).filter(function (h) { return !h.asFaction && h.parent && rootOf(s, h.id) === rootOf(s, mainId) && h.id !== mainId && h.head && alive(s, h.head); }).map(function (h) { return Pn(s, h.head); }); }
+  function mergeBranch(s, p, mainId) { // 分家の当主が本家を継ぐ：分家の館・所領・兵は本家のものになる
+    var bh = Object.keys(s.houses).map(function (k) { return s.houses[k]; }).filter(function (h) { return !h.asFaction && h.head === p.id && h.parent; })[0]; if (!bh) return;
+    var mainF = F(s, mainId), mainH = H(s, mainId) && !H(s, mainId).asFaction ? H(s, mainId) : null;
+    Object.keys(s.bases).forEach(function (k) { var b = s.bases[k]; if (b.house !== bh.id) return; if (mainF) { b.owner = mainF.id; b.house = null; } else b.house = mainH.id; });
+    Object.keys(s.holdings).forEach(function (k) { var h = s.holdings[k]; if (h.house !== bh.id) return; if (mainF) { h.controller = mainF.id; h.house = null; } else h.house = mainH.id; });
+    Object.keys(s.bands).forEach(function (k) { var b = s.bands[k]; if (b.house !== bh.id) return; if (mainF) { b.faction = mainF.id; b.house = null; } else b.house = mainH.id; });
+    Object.keys(s.armies).forEach(function (k) { var a = s.armies[k]; if (a.house !== bh.id) return; if (mainF) { a.faction = mainF.id; a.house = null; } else a.house = mainH.id; });
+    bh.members.forEach(function (m) { var q = Pn(s, m); if (!q) return; if (mainF) q.faction = mainF.id; else { q.faction = mainH.faction; if (mainH.members.indexOf(m) < 0) mainH.members.push(m); } });
+    if (mainF) { mainF.money += bh.money || 0; } else { mainH.money = (mainH.money || 0) + (bh.money || 0); }
+    delete s.houses[bh.id]; news(s, p.name + 'が本家を継ぎ、' + bh.name + 'は本家に戻った', { type: 'politics', important: true });
+  }
+  // ---- 家が力をつけると自ら館を建て、主君（NPC）は伸びてきた家に館を与える
+  function houseBuildTick(s) {
+    Object.keys(s.houses || {}).forEach(function (k) { var h = s.houses[k]; if (h.asFaction || !h.head || !alive(s, h.head)) return; var f = F(s, h.faction); if (!f || !f.alive) return;
+      if ((h.money || 0) < 150 || houseTroops(s, h.id) < 100) return;
+      if (Object.keys(s.bases).filter(function (b) { return s.bases[b].house === h.id; }).length >= 3 || Object.keys(s.constructions).some(function (c) { return s.constructions[c].house === h.id; })) return;
+      if (rand(s) > 0.04 + (h.influence || 0) / 600 + Math.min(0.06, houseTroops(s, h.id) / 6000)) return;
+      var seat = B(s, h.seat) || Object.keys(s.bases).map(function (b) { return s.bases[b]; }).filter(function (b) { return b.house === h.id; })[0], pv = seat ? seat.province : (houseBands(s, h.id)[0] || {}).province; if (!pv) return;
+      var cx = seat ? seat.x : PV(s, pv).x, cy = seat ? seat.y : PV(s, pv).y, x = null, y = null;
+      for (var i = 0; i < 8 && x == null; i++) { var tx = cx + rr(s, -10, 10), ty = cy + rr(s, -10, 10); if (!Object.keys(s.bases).some(function (b) { return Math.hypot(s.bases[b].x - tx, s.bases[b].y - ty) < 3; }) && Math.hypot(tx - PV(s, pv).x, ty - PV(s, pv).y) < 40) { x = tx; y = ty; } }
+      if (x == null) return; h.money -= 150;
+      var id = nid(s, 'build'), nm = surnameOf(pname(s, h.head)) + 'の新館'; s.constructions[id] = { id: id, faction: h.faction, house: h.id, province: pv, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, name: nm, scale: 'small', spec: BUILD.small, progress: 0, required: BUILD.small.days, started: s.day, threatDays: 0, paused: false };
+      news(s, '【普請】' + h.name + 'が' + PV(s, pv).name + 'で' + nm + 'の普請を始めた（家の力が増した）', { type: 'build', factions: [h.faction], province: pv });
+    });
+    // NPCの主君は、序列の上がった家に館を与える
+    Object.keys(s.factions).forEach(function (fid) { var f = s.factions[fid]; if (!f.alive || fid === s.playerFaction || fid === 'court' || rand(s) > 0.05) return;
+      var spare = Object.keys(s.bases).map(function (k) { return s.bases[k]; }).filter(function (b) { return b.owner === fid && !b.house && b.id !== f.capital && (b.type === '館' || b.type === '城') && !Object.keys(s.battles).some(function (k) { return s.battles[k].base === b.id; }); });
+      if (spare.length < 2) return; var rk = gokeninRanking(s, fid).filter(function (x) { return x.kind === 'house'; }); if (!rk.length) return;
+      var up = rk.filter(function (x) { var h = H(s, x.id); return h && (h.lastRank == null || x.rankNo < h.lastRank) && (h.granted == null || s.day - h.granted > 720); })[0];
+      rk.forEach(function (x) { var h = H(s, x.id); if (h) h.lastRank = x.rankNo; });
+      if (!up) return; var r = grantBase(s, fid, { base: spare[spare.length - 1].id, to: up.id, troops: 0 }); if (r.ok) aiLog(s, fid, '館を与える', up.name);
+    });
+  }
+  function siegeMinDays(b) { return 4 + Math.round((b.defense || 0) / 5); }
+  // ---- 見張り：出陣中の軍を任意の味方の拠点に置き、留め置く（館に戻らない）。拠点が攻められると守りに加わる
+  function stationArmy(s, fid, cmd) {
+    var a = s.armies[cmd.army], b = B(s, cmd.base); if (!a || a.faction !== fid) return { ok: false, reason: '自軍の軍勢を選ぶこと' }; if (!b || !b.owner || !sameCamp(s, b.owner, fid)) return { ok: false, reason: '味方の拠点を選ぶこと' };
+    if (a.battleId) return { ok: false, reason: '交戦中は動かせない' };
+    if (cmd.merge) { if (a.province !== b.province) return { ok: false, reason: b.name + 'のある国にいる軍だけが守備兵に加われる' }; var n = Math.round(a.troops); b.garrison += n; var lab = armyLabel(s, a); delete s.armies[a.id]; news(s, lab + 'は' + b.name + 'の守備兵に加わった（守備' + Math.round(b.garrison) + '）', { type: 'military', factions: [fid], province: b.province }); return { ok: true, message: lab + 'を' + b.name + 'の守備兵に加えた（守備 ' + Math.round(b.garrison) + '）' }; }
+    if (a.province === b.province) { a.target = { type: 'base', id: b.id }; a.path = []; a.edge = null; a.status = 'idle'; a.base = b.id; }
+    else { var e = setArmyTarget(s, a, { type: 'base', id: b.id }, 'guard'); if (e) return { ok: false, reason: e }; }
+    a.mission = 'guard'; a.guardBase = b.id; a.chase = null; a.lordOrder = null; a.corps = a.corps && s.corps[a.corps] ? a.corps : null;
+    var msg = armyLabel(s, a) + 'を' + b.name + 'の見張りに置く' + (a.province === b.province ? '' : '（向かっている）') + '。攻められれば守りに加わり、命令するまで留まる';
+    news(s, '【見張り】' + msg, { type: 'military', factions: [fid], province: b.province }); return { ok: true, message: msg };
+  }
+  function lastBaseFall(s, old, winF, b) {
+    var of = F(s, old); if (!of || !of.alive) return; var captor = winF, cf = F(s, captor); var caught = [], fled = [];
+    var field = Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return a.faction === old && !a.battleId; }), fieldT = field.reduce(function (t, a) { return t + a.troops; }, 0);
+    if (fieldT >= 500) { // 大軍が外にいる：本拠にいた人は捕らえられるが、軍とともにいる人は落ち延びて流浪する
+      var inArmy = {}; field.forEach(function (a) { (a.commander ? [a.commander] : []).concat(a.officers || []).forEach(function (pid) { inArmy[pid] = 1; }); });
+      factionPersons(s, old).forEach(function (p) { if (!p.alive || p.captiveOf || inArmy[p.id] || /^army:/.test(String(p.location || ''))) return; if (p.location === b.id || !B(s, p.location) || B(s, p.location).owner !== old) { p.captiveOf = captor; p.location = cf && B(s, cf.capital) ? cf.capital : b.id; caught.push(p); } });
+      of.status = '流浪'; news(s, '【落城】' + b.name + 'が落ちた。' + of.name + 'は本拠を失い、軍勢' + Math.round(fieldT) + 'とともに流浪する' + (caught.length ? '（' + caught.map(function (p) { return p.name; }).join('・') + 'は捕らえられた）' : ''), { type: 'battle', important: true, factions: [captor, old] });
+      if (caught.length) { s.captiveGroups = s.captiveGroups || {}; var gid0 = nid(s, 'cg'); s.captiveGroups[gid0] = { id: gid0, from: old, fromName: of.name, captor: captor, persons: caught.map(function (p) { return p.id; }), base: b.id, day: s.day };
+        if (s.playerFaction && topLord(s, captor) === topLord(s, s.playerFaction)) stop(s, { key: 'captives', group: gid0, title: of.name.replace(/（.*）/, '') + 'の捕虜の処遇', persons: caught.map(function (p) { return p.id; }).slice(0, 6), text: b.name + 'で' + caught.map(function (p) { return p.name; }).join('・') + 'を捕らえた（' + of.name + 'は軍勢とともに落ち延びた）。処遇を決める。', choices: [{ id: 'retain', label: '家臣にする' }, { id: 'behead', label: '斬首する' }, { id: 'release', label: '解放する' }, { id: 'gokumon', label: 'さらし首にする（見せしめ）' }] });
+        else resolveCaptives(s, gid0, rand(s) < 0.5 ? 'behead' : 'release'); }
+      return; }
+    Object.keys(s.armies).forEach(function (k) { var a = s.armies[k]; if (a.faction !== old) return; if (a.commander && Pn(s, a.commander)) a.commander = a.commander; disbandArmy(s, a); }); // 本拠を失った軍は降り、散る
+    factionPersons(s, old).forEach(function (p) { if (!p.alive || p.captiveOf) return; if (histMode(s) && historyProtects(s, p, winF, old)) { fled.push(p); p.location = null; p.status = '逃亡'; return; }
+      p.captiveOf = captor; p.location = cf && B(s, cf.capital) ? cf.capital : b.id; caught.push(p); });
+    destroyFaction(s, of, '最後の拠点' + b.name + 'を失った');
+    var names = caught.map(function (p) { return p.name; }).join('・');
+    news(s, '【落城】' + b.name + 'が落ち、' + of.name + 'は滅んだ。' + (caught.length ? names + 'が捕らえられた' : '') + (fled.length ? '（' + fled.map(function (p) { return p.name; }).join('・') + 'は落ち延びた）' : ''), { type: 'battle', important: true, factions: [captor, old] });
+    if (!caught.length) return;
+    s.captiveGroups = s.captiveGroups || {}; var gid = nid(s, 'cg'); s.captiveGroups[gid] = { id: gid, from: old, fromName: of.name, captor: captor, persons: caught.map(function (p) { return p.id; }), base: b.id, day: s.day };
+    if (topLord(s, captor) === topLord(s, s.playerFaction) && s.playerFaction) stop(s, { key: 'captives', group: gid, title: of.name.replace(/（.*）/, '') + '一族の処遇', persons: caught.map(function (p) { return p.id; }).slice(0, 6),
+      text: b.name + 'を落とし、' + of.name + 'の一族を捕らえた：' + names + '。\n処遇を決める。家臣にすれば将として使えるが恨みを抱く。斬首すれば後の憂いはない。解放すれば寛大さが評判となる。さらし首は見せしめとなり御家人は身を引き締める（忠誠が上がる）が、人心は離れる。',
+      choices: [{ id: 'retain', label: '家臣にする' }, { id: 'behead', label: '斬首する' }, { id: 'release', label: '解放する' }, { id: 'gokumon', label: 'さらし首にする（見せしめ）' }] });
+    else resolveCaptives(s, gid, rand(s) < 0.35 ? 'retain' : rand(s) < 0.6 ? 'behead' : 'release');
+  }
+  function resolveCaptives(s, gid, choice) {
+    var g = (s.captiveGroups || {})[gid]; if (!g) return '捕虜はもういない'; delete s.captiveGroups[gid]; var cf = F(s, g.captor), lord = topLord(s, g.captor);
+    var ps = g.persons.map(function (id) { return Pn(s, id); }).filter(function (p) { return p && p.alive && p.captiveOf === g.captor; }); if (!ps.length) return '捕虜はもういない';
+    var warrior = function (p) { return (p.abilities.command || 0) >= 30 || (p.abilities.valor || 0) >= 30; }, names = ps.map(function (p) { return p.name; }).join('・'), msg;
+    if (choice === 'retain') { ps.forEach(function (p) { p.captiveOf = null; p.faction = g.captor; p.loyalty = 35; p.status = '降人（もと' + g.fromName.replace(/（.*）/, '') + '）'; p.location = cf && cf.capital ? cf.capital : p.location; }); msg = names + 'を家臣とした（降人なので忠誠は低い）'; }
+    else if (choice === 'release') { ps.forEach(function (p) { p.captiveOf = null; p.faction = null; p.status = '解放された浪人'; p.location = null; }); if (cf) cf.legitimacy = clamp(cf.legitimacy + 2, 0, 100);
+      Object.keys(s.factions).forEach(function (k) { if (k !== g.captor && s.factions[k].alive) { var rv = rel(s, k, g.captor); rv.value = clamp(rv.value + 2, -100, 100); } }); msg = names + 'を解放した（寛大さが評判となった）'; }
+    else { var ex = ps.filter(warrior), rest = ps.filter(function (p) { return !warrior(p); });
+      ex.forEach(function (p) { killPerson(s, p, 'execution', choice === 'gokumon' ? '斬られ、首をさらされた' : '斬首された'); }); rest.forEach(function (p) { p.captiveOf = null; p.faction = null; p.status = '助命された'; p.location = null; });
+      if (choice === 'gokumon') { if (cf) cf.legitimacy = clamp(cf.legitimacy - 3, 0, 100); retainersOf(s, lord).forEach(function (r) { retAddLoyalty(s, r, lord, 5); }); var b0 = B(s, g.base); if (b0 && PV(s, b0.province)) PV(s, b0.province).unrest = clamp((PV(s, b0.province).unrest || 0) + 12, 0, 100);
+        Object.keys(s.factions).forEach(function (k) { if (k !== g.captor && s.factions[k].alive && !sameCamp(s, k, g.captor)) { var rv = rel(s, k, g.captor); rv.value = clamp(rv.value - 6, -100, 100); } }); }
+      msg = ex.map(function (p) { return p.name; }).join('・') + (choice === 'gokumon' ? 'を斬り、首をさらした（御家人は身を引き締めた。忠誠+5／人心は離れた）' : 'を斬首した') + (rest.length ? '。' + rest.map(function (p) { return p.name; }).join('・') + 'は助命した' : ''); }
+    news(s, '【処遇】' + msg, { type: 'politics', important: true, factions: [g.captor] }); return msg;
+  }
+  // ---- 屋敷：人物ごとに、味方の拠点の近くに構える（一人に複数可・当主自身も持てる）
+  function ensureYashiki(s) { if (!s.yashiki) { s.yashiki = []; Object.keys(s.houses).forEach(function (k) { var h = s.houses[k]; if (h.yashiki && B(s, h.yashiki) && h.head) s.yashiki.push({ id: 'ys_' + k, person: h.head, base: h.yashiki, house: k, day: s.day }); }); } return s.yashiki; }
+  function yashikiName(s, y) { return pname(s, y.person) + 'の屋敷'; }
+  function giveYashiki(s, fid, cmd) {
+    var f = F(s, fid), b = B(s, cmd.base || (f && f.capital)); if (!f || !b) return { ok: false, reason: '屋敷を構える拠点を選ぶこと' };
+    if (!b.owner || topLord(s, b.owner) !== topLord(s, fid)) return { ok: false, reason: '味方の拠点の近くにしか構えられない' };
+    var r = retainersOf(s, fid).filter(function (x) { return x.id === cmd.target; })[0], p = r ? (r.kind === 'house' ? Pn(s, H(s, r.id).head) : Pn(s, F(s, r.id).leader)) : Pn(s, cmd.target);
+    if (!p || !p.alive || p.captiveOf || topLord(s, p.faction) !== topLord(s, fid)) return { ok: false, reason: '味方の人物を選ぶこと' };
+    var ys = ensureYashiki(s); if (ys.some(function (y) { return y.person === p.id && y.base === b.id; })) return { ok: false, reason: p.name + 'はすでに' + b.name + 'に屋敷を持つ' };
+    var cost = 150; if (f.money < cost) return { ok: false, reason: '銭が足りない（150貫）' }; f.money -= cost;
+    var first = !ys.some(function (y) { return y.person === p.id; }), self = p.id === f.leader, hk = houseOfPerson(s, p.id);
+    ys.push({ id: nid(s, 'ys'), person: p.id, base: b.id, house: s.houses[hk] && !s.houses[hk].asFaction ? hk : null, faction: p.faction, day: s.day, by: fid });
+    if (!self) { var gain = first ? 15 : 7; var rr = r || retainersOf(s, fid).filter(function (x) { return x.kind === 'house' ? x.id === hk : x.id === p.faction; })[0]; if (rr) { retAddLoyalty(s, rr, fid, gain); addService(s, fid, rr.id, -3); if (rr.kind === 'house') H(s, rr.id).yashiki = b.id; else F(s, rr.id).yashiki = b.id; } p.loyalty = clamp((p.loyalty == null ? 60 : p.loyalty) + gain, 0, 100); }
+    var msg = self ? b.name + 'に' + p.name + 'の屋敷を構えた' : p.name + 'に' + b.name + 'の屋敷を与えた（' + (first ? '忠誠が大きく上がった' : '忠誠が上がった') + '）';
+    news(s, '【屋敷】' + msg, { type: 'politics', factions: [fid] }); return { ok: true, message: msg };
+  }
+  // ---- 上洛：当主など人物が兵を率いて京へ上る（着けば朝廷との結びつき・正統性が上がる）
+  function jokyo(s, fid, cmd) {
+    var f = F(s, fid), p = Pn(s, cmd.person || (f && f.leader)); if (!f || !p) return { ok: false, reason: '上洛する人物を選ぶこと' };
+    if (!personFree(s, p.id, fid)) return { ok: false, reason: p.name + 'はいま動けない（出陣中・在京の官・捕縛など）' };
+    var kyo = B(s, s.court.location || 'heiankyo'); if (!kyo) return { ok: false, reason: '京が見つからない' };
+    if (kyo.owner && atWar(s, fid, kyo.owner)) return { ok: false, reason: '京は敵（' + fname(s, kyo.owner) + '）が押さえている。上洛ではなく攻め上ること（出陣で京を攻め先に）' };
+    var loc = B(s, p.location), from = loc ? loc.province : (B(s, f.capital) || {}).province; if (!from) return { ok: false, reason: '出発する国がない' };
+    if (from === kyo.province) return { ok: false, reason: p.name + 'はすでに京にいる' };
+    var n = Math.max(30, Math.round(cmd.troops || 100)), avail = Object.keys(s.bands).map(function (k) { return s.bands[k]; }).filter(function (b) { return b.faction === fid && !b.house && b.province === from; }).reduce(function (t, b) { return t + Math.max(0, b.strength - (b.mobilized || 0)); }, 0);
+    if (avail < 30) return { ok: false, reason: PV(s, from).name + 'に供の兵がいない（30以上要る）' }; n = Math.min(n, avail);
+    var m = mobilize(s, fid, from, n, p.id, { gather: 3, foodDays: 40, force: true, allowNeighbors: false }); if (!m.army) return { ok: false, reason: m.reason || '兵を集められない' };
+    var a = typeof m.army === 'string' ? s.armies[m.army] : m.army; var e = setArmyTarget(s, a, { type: 'province', id: kyo.province }, 'move'); if (e) { disbandArmy(s, a); return { ok: false, reason: e }; }
+    a.jokyo = { person: p.id, lord: fid }; a.status = 'gathering'; a.gatherUntil = s.day + 3;
+    var msg = p.name + 'が' + a.troops + 'の兵を率いて上洛の途についた（' + PV(s, from).name + 'から京へ）';
+    news(s, '【上洛】' + msg, { type: 'politics', important: true, factions: [fid] }); return { ok: true, message: msg };
+  }
+  function jokyoTick(s) { Object.keys(s.armies).forEach(function (k) { var a = s.armies[k]; if (!a.jokyo) return; var kyo = B(s, s.court.location || 'heiankyo');
+    if (kyo && a.province === kyo.province && (a.status === 'idle' || a.status === 'arrived')) { var f = F(s, a.jokyo.lord), p = Pn(s, a.jokyo.person); a.jokyo = null; if (!f || !p) return;
+      f.legitimacy = clamp(f.legitimacy + 8, 0, 100); ensureCourt(s); Object.keys(s.court.cliques).forEach(function (c) { var cl = s.court.cliques[c]; cl.favor = cl.favor || {}; cl.favor[f.id] = clamp((cl.favor[f.id] || 0) + 10, -100, 100); }); f.flags.jokyo = s.day; p.location = kyo.id;
+      news(s, '【上洛】' + p.name + 'が京に入った。朝廷・院との結びつきが深まり、名声が上がった（正統性+8・朝廷の派閥の好意+10）', { type: 'court', important: true, factions: [f.id] });
+      if (f.id === s.playerFaction) stop(s, { key: 'court', title: '上洛：' + p.name, persons: [p.id], text: p.name + 'が' + a.troops + 'の兵とともに京に入った。朝廷・院との結びつきが深まった（正統性+8）。\n京にいる間は院宣・任官の申請が通りやすい。軍勢は地図から本拠へ戻せる。', choices: [] }); } }); }
+  // 頼朝の妻など、当主の夫婦は家（北条氏など）ではなく当主のもとにいる
+  function migrateHouses5(s) { if (s.flags.houseModel >= 5) return; s.flags.houseModel = 5; return; // 妻（政子など）は家の人のまま、画面では当主の一族として示す
+    Object.keys(s.houses).forEach(function (k) { var h = s.houses[k]; if (h.asFaction || !h.members) return; var lf = F(s, h.lord || h.faction); if (!lf) return;
+      h.members = h.members.filter(function (m) { var p = Pn(s, m); var spouse = p && (p.relations || []).some(function (r) { return r.person === lf.leader && /夫婦/.test(r.type); }) || (Pn(s, lf.leader) && (Pn(s, lf.leader).relations || []).some(function (r) { return r.person === m && /夫婦/.test(r.type); })); return !spouse || m === h.head; }); }); }
   function grantBase(s, fid, cmd) {
     var f = F(s, fid), b = B(s, cmd.base); if (!f || !b) return { ok: false, reason: '館を選ぶこと' };
     if (b.owner !== fid) return { ok: false, reason: b.name + 'は自勢力の直轄ではない' }; if (b.house) return { ok: false, reason: b.name + 'はすでに' + H(s, b.house).name + 'の館' };
@@ -1190,10 +1623,14 @@
     var moveTroops = function (hid) { var left = give; avail.forEach(function (x) { var n = Math.min(left, x.strength - (x.mobilized || 0)); if (n <= 0) return; x.strength -= n; x.base = Math.max(0, (x.base || x.strength) - n); left -= n; });
       if (give > 0) { var hb = houseBands(s, hid).filter(function (x) { return x.province === b.province; })[0]; if (!hb) { var bid = nid(s, 'band'); hb = s.bands[bid] = { id: bid, faction: fid, house: hid, province: b.province, name: H(s, hid).name + 'の郎党', strength: 0, base: 0, mobilized: 0, confidence: 'ゲーム展開' }; } hb.strength += give; hb.base = (hb.base || 0) + give; } };
     if (p) {
-      if (!p.alive || p.faction !== fid || p.captiveOf || p.id === f.leader) return { ok: false, reason: '自勢力の家臣（当主以外）を選ぶこと' };
-      var hk0 = houseOfPerson(s, p.id); if (s.houses[hk0] && !s.houses[hk0].asFaction) return { ok: false, reason: p.name + 'は' + s.houses[hk0].name + 'の人。家（' + s.houses[hk0].name + '）を選んで与えること' };
-      var sn = surnameOf(p.name), hname = sn + '氏', hid = 'h_' + p.id; if (Object.keys(s.houses).some(function (k) { return s.houses[k].name === hname; })) hname = p.name + 'の家';
-      s.houses[hid] = { id: hid, name: hname, faction: fid, lord: fid, head: p.id, members: [p.id], ambition: p.ambition || 50, influence: 0, heir: null, money: 150, food: 800, loyalty: 92, seat: b.id, note: (f.name.replace(/（.*）/, '')) + 'から' + b.name + 'を与えられて独立した家', rel: {}, cohesion: 70, heirStab: 50, granted: s.day, grantedBy: fid };
+      var pvF = p.faction !== fid && F(s, p.faction) && F(s, p.faction).alive && topLord(s, p.faction) === fid ? F(s, p.faction) : null; // 御家人（勢力）の家の人
+      if (pvF && pvF.leader === p.id) return grantBase(s, fid, { base: cmd.base, to: pvF.id, troops: cmd.troops });
+      if (!p.alive || (p.faction !== fid && !pvF) || p.captiveOf || p.id === f.leader) return { ok: false, reason: '自勢力の家臣・御家人の家の人（当主以外）を選ぶこと' };
+      if (pvF) { p.faction = fid; if (pvF.heir === p.id) pvF.heir = null; } // 御家人の家から出て、主君に直に仕える家を立てる
+      var hk0 = pvF ? null : houseOfPerson(s, p.id), parentH = hk0 && s.houses[hk0] && !s.houses[hk0].asFaction ? s.houses[hk0] : null; if (parentH && parentH.head === p.id) return grantBase(s, fid, { base: cmd.base, to: hk0, troops: cmd.troops });
+      if (parentH) parentH.members = parentH.members.filter(function (m) { return m !== p.id; }); // 家の人を館で独立させる（分家）
+      var sn = surnameOf(p.name), hname = sn + '氏', hid = 'h_' + p.id; if (parentH || pvF) hname = p.name + '家'; if (Object.keys(s.houses).some(function (k) { return s.houses[k].name === hname; })) hname = p.name + 'の家';
+      s.houses[hid] = { id: hid, name: hname, faction: fid, lord: fid, head: p.id, members: [p.id], ambition: p.ambition || 50, influence: 0, heir: null, money: 150, food: 800, loyalty: 92, seat: b.id, note: (f.name.replace(/（.*）/, '')) + 'から' + b.name + 'を与えられて独立した家' + (parentH ? '（' + parentH.name + 'の分家）' : pvF ? '（' + pvF.name.replace(/（.*）/, '') + 'の分家）' : ''), parent: parentH ? hk0 : pvF ? pvF.id : undefined, rel: {}, cohesion: 70, heirStab: 50, granted: s.day, grantedBy: fid };
       b.house = hid; moveTroops(hid); p.loyalty = clamp((p.loyalty == null ? 60 : p.loyalty) + 15, 0, 100); p.location = b.id; p.status = hname + 'の当主';
       // 館のある国の直轄の所領をひとつ添える（なければ館だけ）
       var hd = Object.keys(s.holdings).filter(function (k) { var x = s.holdings[k]; return x.province === b.province && x.controller === fid && !x.house && x.type !== '国衙領'; }).sort(function (a, c) { return s.holdings[a].output - s.holdings[c].output; })[0];
@@ -1212,6 +1649,7 @@
     var nm = String(cmd.name || '').trim(); if (!nm || nm.length > 16) return { ok: false, reason: '名前は1〜16文字' }; if (Object.keys(s.bases).some(function (k) { return k !== b.id && s.bases[k].name === nm; })) return { ok: false, reason: '同じ名前の拠点がある' };
     var old = b.name; b.name = nm; b.renamed = old; return { ok: true, message: old + 'を「' + nm + '」と改めた' }; }
   function bestow(s, fid, cmd) {
+    if (cmd.kind === 'yashiki') return giveYashiki(s, fid, cmd);
     var f = F(s, fid), d = BESTOW[cmd.kind]; if (!f) return { ok: false, reason: '勢力が不明' }; if (!d) return { ok: false, reason: '与えるものを選ぶこと' };
     var r = retainersOf(s, fid).filter(function (x) { return x.id === cmd.target; })[0], p = !r ? Pn(s, cmd.target) : null;
     if (!r && !(p && p.alive && p.faction === fid && p.id !== f.leader)) return { ok: false, reason: '自分に従う家・御家人・家臣を選ぶこと' };
@@ -1236,7 +1674,7 @@
     return { ok: true, message: msg };
   }
   // 屋敷を構えて出仕する家は、主君の呼びかけに応じやすい
-  function yashikiBonus(s, lord, r) { var x = r.kind === 'house' ? H(s, r.id) : F(s, r.id); return x && x.yashiki && B(s, x.yashiki) && sameCamp(s, B(s, x.yashiki).owner, lord) ? 8 : 0; }
+  function yashikiBonus(s, lord, r) { var x = r.kind === 'house' ? H(s, r.id) : F(s, r.id); if (x && x.yashiki && B(s, x.yashiki) && sameCamp(s, B(s, x.yashiki).owner, lord)) return 8; var ms = r.kind === 'house' ? (x && x.members || []) : factionPersons(s, r.id).map(function (p) { return p.id; }); return (s.yashiki || []).some(function (y) { return ms.indexOf(y.person) >= 0 && B(s, y.base) && sameCamp(s, B(s, y.base).owner, lord); }) ? 8 : 0; }
   function lordAct(s, fid, cmd) {
     var f = F(s, fid), rs = retainersOf(s, fid), r = rs.filter(function (x) { return x.id === cmd.target; })[0];
     if (cmd.type === 'ando') {
@@ -1415,6 +1853,239 @@
     return { ok: true, message: label + '：' + okN + '／' + res.length + '家が応じた', results: res };
   }
   // 比企氏の館（比企郡）：頼朝の乳母・比企尼の一族の本領
+  // ================================================================ 東国の諸家（v2.4）：安房・下総・武蔵・常陸・下野・上野・駿河・遠江・相模の在地勢力
+  // 資料：『鎌倉初期の武士の家・本拠地・勢力圏一覧』（ユーザー提供の資料）。nabiki＝頼朝方の大軍になびきやすさ（隠し値 0〜100）、kyogata＝朝廷（院）の追討に応じやすさ（隠し値 0〜100）
+  var CLANS = [
+    { id: 'anzai', name: '安西氏', prov: 'awa_t', lean: null, nabiki: 95, kyogata: 5, troops: 200, color: '#5d8aa8', policy: '源氏寄り', conf: '史実',
+      base: { id: 'anzai_yakata', name: '安西館', x: 1098.3, y: 817.2, lat: 34.99, lon: 139.86, def: 10, gar: 120 }, hold: [['anzai_go', '安西郷', '郡郷', 2600]],
+      leader: ['kagemasu', '安西景益', 'あんざいかげます', null, null, { command: 45, valor: 50, politics: 45, intellect: 45, diplomacy: 50 }, '篤実'], note: '安房の在地武士。石橋山で敗れた頼朝を迎えた（史実）' },
+    { id: 'nagasa', name: '長狭氏', prov: 'awa_t', lean: 'heike', nabiki: 12, kyogata: 20, troops: 200, color: '#7b5e57', policy: '平家に従う', conf: '推定',
+      base: { id: 'nagasa_yakata', name: '長狭館', x: 1117.4, y: 801.4, lat: 35.13, lon: 140.06, def: 12, gar: 120 }, hold: [['nagasa_gun', '長狭郡', '郡郷', 2400]],
+      leader: ['tsunetomo', '長狭常伴', 'ながさつねとも', null, 1180, { command: 45, valor: 55, politics: 30, intellect: 35, diplomacy: 25 }, '頑固'], note: '安房に渡った頼朝を襲おうとして三浦義澄らに討たれた（史実）。支配範囲は概略' },
+    { id: 'kasai', name: '葛西氏', prov: 'shimosa', lean: null, nabiki: 88, kyogata: 5, troops: 220, color: '#4f7f6f', policy: '源氏寄り', conf: '史実',
+      base: { id: 'kasai_yakata', name: '葛西館', x: 1098.3, y: 734.6, lat: 35.72, lon: 139.86, def: 10, gar: 100 }, hold: [['kasai_mikuriya', '葛西御厨', '御厨', 2400]],
+      leader: ['kiyoshige', '葛西清重', 'かさいきよしげ', 1161, 1238, { command: 60, valor: 60, politics: 60, intellect: 55, diplomacy: 55 }, '実直'], note: '秩父党の豊島清元の子。頼朝に早くから従う（史実）。葛西御厨は下総国葛飾郡（資料は武蔵系として扱う）' },
+    { id: 'toshima', name: '豊島氏', prov: 'musashi', lean: null, nabiki: 82, kyogata: 5, troops: 200, color: '#5b7f4f', policy: '源氏寄り', conf: '史実',
+      base: { id: 'toshima_yakata', name: '豊島館', x: 1084, y: 730.1, lat: 35.76, lon: 139.71, def: 10, gar: 100 }, hold: [['toshima_gun', '豊島郡', '郡郷', 2300]],
+      leader: ['kiyomoto', '豊島清元', 'としまきよもと', null, null, { command: 50, valor: 50, politics: 50, intellect: 45, diplomacy: 50 }, '温和'], note: '秩父党系。子の葛西清重とともに頼朝に参じた（史実）' },
+    { id: 'edo', name: '江戸氏', prov: 'musashi', lean: 'heike', nabiki: 55, kyogata: 10, troops: 300, color: '#6a5f8f', policy: '平家に従う', conf: '史実',
+      base: { id: 'edo_yakata', name: '江戸館', x: 1088.8, y: 738.6, lat: 35.685, lon: 139.76, def: 12, gar: 150 }, hold: [['edo_go', '江戸郷', '郡郷', 2800]],
+      leader: ['shigenaga', '江戸重長', 'えどしげなが', null, null, { command: 55, valor: 55, politics: 50, intellect: 50, diplomacy: 45 }, '慎重'], note: '秩父党。衣笠城攻めでは平家方。のち頼朝に帰順（史実）' },
+    { id: 'kumagai', name: '熊谷氏', prov: 'musashi', lean: 'heike', nabiki: 72, kyogata: 5, troops: 60, color: '#8f6a4f', policy: '平家に従う', conf: '史実',
+      base: { id: 'kumagai_yakata', name: '熊谷館', x: 1052.5, y: 685.9, lat: 36.15, lon: 139.38, def: 6, gar: 40 }, hold: [['kumagai_go', '熊谷郷', '郡郷', 900]],
+      leader: ['naozane', '熊谷直実', 'くまがいなおざね', 1141, 1207, { command: 50, valor: 85, politics: 25, intellect: 40, diplomacy: 25 }, '剛直'], note: '石橋山では平家方。のち頼朝に従う（史実）' },
+    { id: 'kodama', name: '児玉党', prov: 'musashi', lean: null, nabiki: 60, kyogata: 15, troops: 320, color: '#7f6f3f', policy: '静観', conf: '推定',
+      base: { id: 'kodama_yakata', name: '児玉館（庄氏）', x: 1028.6, y: 681.4, lat: 36.19, lon: 139.13, def: 10, gar: 150 }, hold: [['kodama_gun', '児玉郡', '郡郷', 2600], ['tano_kozuke', '多胡・緑野（上野の所領）', '郡郷', 1800, 'kozuke']],
+      base2: { id: 'kodama_kozuke', name: '児玉党の上野の館', prov: 'kozuke', x: 1021, y: 669, lat: 36.30, lon: 139.05, def: 6, gar: 60 },
+      leader: ['ienaga', '庄家長', 'しょういえなが', null, null, { command: 55, valor: 65, politics: 35, intellect: 40, diplomacy: 35 }, '勇猛'], note: '武蔵七党の一つ。武蔵北部から上野にかけて一族が広がる。当主の比定はゲーム設定' },
+    { id: 'yokoyama', name: '横山党', prov: 'musashi', lean: null, nabiki: 55, kyogata: 20, troops: 300, color: '#6f7f3f', policy: '静観', conf: '推定',
+      base: { id: 'yokoyama_yakata', name: '横山館', x: 1047.7, y: 741.4, lat: 35.66, lon: 139.33, def: 10, gar: 150 }, hold: [['yokoyama_sho', '横山荘', '荘園', 2600]],
+      leader: ['tokihiro', '横山時広', 'よこやまときひろ', null, null, { command: 50, valor: 60, politics: 40, intellect: 40, diplomacy: 40 }, '武骨'], note: '武蔵七党の一つ。和田義盛と姻戚で、和田合戦では和田方（史実）' },
+    { id: 'oyama', name: '小山氏', prov: 'shimotsuke', lean: null, nabiki: 90, kyogata: 5, troops: 550, color: '#3f6f8f', policy: '源氏寄り', conf: '史実',
+      base: { id: 'oyama_yakata', name: '小山館（祇園城）', x: 1092.6, y: 667.8, lat: 36.31, lon: 139.80, def: 14, gar: 250 }, hold: [['oyama_sho', '小山荘', '荘園', 4200]],
+      leader: ['tomomasa', '小山朝政', 'おやまともまさ', 1155, 1238, { command: 70, valor: 65, politics: 60, intellect: 60, diplomacy: 55 }, '堅実'],
+      members: [['tomomitsu', '結城朝光', 'ゆうきともみつ', 1168, 1254, { command: 60, valor: 65, politics: 65, intellect: 65, diplomacy: 60 }, '機敏', '朝政の弟。母の寒河尼は頼朝の乳母（史実）']],
+      note: '秀郷流藤原氏。父政光は在京中。母の寒河尼は頼朝の乳母で、早くから頼朝に従う（史実）' },
+    { id: 'utsunomiya', name: '宇都宮氏', prov: 'shimotsuke', lean: 'heike', nabiki: 55, kyogata: 10, troops: 400, color: '#5f4f8f', policy: '平家に従う', conf: '史実',
+      base: { id: 'utsunomiya_yakata', name: '宇都宮館', x: 1100.2, y: 639.5, lat: 36.56, lon: 139.88, def: 14, gar: 200 }, hold: [['utsunomiya_sha', '宇都宮社領', '社領', 3600]],
+      leader: ['tomotsuna', '宇都宮朝綱', 'うつのみやともつな', 1122, 1204, { command: 55, valor: 50, politics: 60, intellect: 55, diplomacy: 55 }, '老練'], note: '宇都宮社の社務職。挙兵のころ平家に仕えて在京、のち東国へ下り頼朝に従う（史実）' },
+    { id: 'nasu', name: '那須氏', prov: 'shimotsuke', lean: 'heike', nabiki: 45, kyogata: 10, troops: 220, color: '#4f5f7f', policy: '平家に従う', conf: '推定',
+      base: { id: 'nasu_yakata', name: '那須館（神田城）', x: 1125.1, y: 628.2, lat: 36.66, lon: 140.14, def: 10, gar: 120 }, hold: [['nasu_gun', '那須郡', '郡郷', 2400]],
+      leader: ['suketaka', '那須資隆', 'なすすけたか', null, null, { command: 45, valor: 55, politics: 35, intellect: 40, diplomacy: 35 }, '寡黙'], note: '那須与一の父とされる。初期の系譜には不確実性がある' },
+    { id: 'shimokobe', name: '下河辺氏', prov: 'shimosa', lean: null, nabiki: 85, kyogata: 10, troops: 220, color: '#3f7f6f', policy: '源氏寄り', conf: '史実',
+      base: { id: 'shimokobe_yakata', name: '下河辺館', x: 1085, y: 691.6, lat: 36.10, lon: 139.72, def: 10, gar: 100 }, hold: [['shimokobe_sho', '下河辺荘', '荘園', 3000]],
+      leader: ['yukihira', '下河辺行平', 'しもこうべゆきひら', null, null, { command: 55, valor: 70, politics: 45, intellect: 50, diplomacy: 45 }, '弓の名手'], note: '秀郷流。源頼政の郎党の家で、以仁王の挙兵を頼朝に伝えた（史実）' },
+    { id: 'hatta', name: '八田氏', prov: 'hitachi', lean: null, nabiki: 85, kyogata: 10, troops: 200, color: '#6f8f5f', policy: '源氏寄り', conf: '史実',
+      base: { id: 'hatta_yakata', name: '八田館', x: 1121.3, y: 680.3, lat: 36.20, lon: 140.10, def: 10, gar: 100 }, hold: [['hatta_go', '八田（小田）', '郡郷', 2200]],
+      leader: ['tomoie', '八田知家', 'はったともいえ', 1142, 1218, { command: 60, valor: 55, politics: 55, intellect: 55, diplomacy: 55 }, '豪放'], note: '宇都宮宗綱の子。子孫は小田氏を称する（史実）' },
+    { id: 'daijo', name: '常陸大掾氏', prov: 'hitachi', lean: null, nabiki: 30, kyogata: 25, troops: 420, color: '#8f7f5f', policy: '静観', conf: '推定',
+      base: { id: 'daijo_yakata', name: '多気館（常陸府中）', x: 1137.5, y: 681.4, lat: 36.19, lon: 140.27, def: 14, gar: 200 }, hold: [['hitachi_fuchu', '常陸府中周辺', '郡郷', 3600]],
+      leader: ['yoshimoto_t', '多気義幹', 'たけよしもと', null, null, { command: 50, valor: 50, politics: 50, intellect: 50, diplomacy: 40 }, '尊大'], note: '常陸国府周辺の大族（平氏系）。建久4年（1193）に所領を失う（史実）' },
+    { id: 'suruga_mokudai', name: '駿河目代（橘遠茂）', prov: 'suruga', lean: 'heike', nabiki: 5, kyogata: 40, troops: 450, color: '#8b1a1a', policy: '平家に従う', conf: '史実', type: '国衙（平家方の目代）',
+      base: { id: 'suruga_kokufu', name: '駿河国府', x: 957.4, y: 818.9, lat: 34.975, lon: 138.385, def: 14, gar: 250 }, hold: [['suruga_kokugaryo', '駿河の国衙領', '国衙領', 4500]],
+      leader: ['tomoshige', '橘遠茂', 'たちばなのとおもち', null, 1180, { command: 55, valor: 50, politics: 50, intellect: 45, diplomacy: 40 }, '頑固'], note: '平家方の駿河目代。治承4年（1180）10月、鉢田で甲斐源氏に敗れ捕らえられた（史実）' },
+    { id: 'irie', name: '入江党（吉香・船越・岡部）', prov: 'suruga', lean: null, nabiki: 62, kyogata: 15, troops: 250, color: '#5f6f4f', policy: '静観', conf: '推定',
+      base: { id: 'irie_yakata', name: '入江館', x: 966.5, y: 815, lat: 35.01, lon: 138.48, def: 10, gar: 120 }, hold: [['irie_sho', '入江荘', '荘園', 2600]],
+      leader: ['tomokane', '吉香友兼', 'きっかわともかね', null, 1200, { command: 50, valor: 60, politics: 35, intellect: 40, diplomacy: 35 }, '勇猛'], note: '駿河・入江荘の工藤（入江）一族。吉香・船越・岡部などに分かれる。当主の比定はゲーム設定' },
+    { id: 'asaba', name: '浅羽氏', prov: 'totomi', lean: null, nabiki: 60, kyogata: 10, troops: 180, color: '#4f6f5f', policy: '静観', conf: '推定',
+      base: { id: 'asaba_yakata', name: '浅羽館', x: 914.9, y: 846.7, lat: 34.73, lon: 137.94, def: 8, gar: 90 }, hold: [['asaba_sho', '浅羽荘', '荘園', 2200]],
+      leader: ['munenobu', '浅羽宗信', 'あさばむねのぶ', null, null, { command: 45, valor: 50, politics: 40, intellect: 40, diplomacy: 40 }, '律儀'], note: '遠江の在地領主。安田義定に属したと伝わる' },
+    { id: 'hatano', name: '波多野氏', prov: 'sagami', lean: 'heike', nabiki: 8, kyogata: 20, troops: 320, color: '#7f3f3f', policy: '平家に従う', conf: '史実',
+      base: { id: 'hatano_yakata', name: '波多野館', x: 1037.2, y: 773.7, lat: 35.375, lon: 139.22, def: 12, gar: 160 }, hold: [['hatano_sho', '波多野荘', '荘園', 3200]],
+      leader: ['yoshitsune_h', '波多野義常', 'はたのよしつね', null, 1180, { command: 50, valor: 50, politics: 45, intellect: 45, diplomacy: 35 }, '頑固'], note: '頼朝の誘いを拒んだ。治承4年10月に自害（史実）。一族の多くはのち御家人となる' }
+,
+    // ---- 関東以外の家（v2.6）：資料『1180年代・関東以外の武士の家と家臣団』より。prefer＝付きたい勢力（甲斐源氏・木曽・菊池など）
+    {"id":"yasuda","name":"安田氏（安田義定）","prov":"kai","lean":"kai","nabiki":30,"kyogata":15,"troops":400,"color":"#c06a2b","policy":"源氏寄り","conf":"史実","base":{"id":"yasuda_yakata","name":"安田館","x":987.4,"y":738.4,"lat":35.69,"lon":138.69,"def":12,"gar":150},"hold":[["yasuda_go","安田郷（八代郡）","郡郷",3000]],"leader":["yoshisada","安田義定","やすだよしさだ",1134,1194,{"command":70,"valor":70,"politics":50,"intellect":55,"diplomacy":50},"剛毅"],"note":"甲斐源氏。1180年に遠江へ進み、のち遠江守。頼朝と対立して滅ぶ（史実）","existing":true},
+    {"id":"kagami","name":"加賀美氏","prov":"kai","lean":"kai","nabiki":40,"kyogata":10,"troops":250,"color":"#c47f3a","policy":"源氏寄り","conf":"史実","base":{"id":"kagami_yakata","name":"加賀美館","x":966.6,"y":749.1,"lat":35.6,"lon":138.47,"def":10,"gar":120},"hold":[["kagami_sho","加賀美荘","荘園",2600]],"leader":["tomitsu","加賀美遠光","かがみとおみつ",1143,1230,{"command":55,"valor":55,"politics":60,"intellect":60,"diplomacy":60},"温厚"],"note":"甲斐源氏。子孫に秋山氏・小笠原氏。後世の領地は遡らせない"},
+    {"id":"henmi","name":"逸見氏","prov":"kai","lean":"kai","nabiki":25,"kyogata":10,"troops":200,"color":"#b8733a","policy":"源氏寄り","conf":"推定","base":{"id":"henmi_yakata","name":"逸見館","x":960.3,"y":720.5,"lat":35.85,"lon":138.4,"def":10,"gar":100},"hold":[["henmi_go","逸見郷","郡郷",2000]],"leader":["mitsunaga","逸見光長","へみみつなが",null,null,{"command":50,"valor":55,"politics":45,"intellect":45,"diplomacy":40},"質実"],"note":"甲斐源氏。武田信義の兄弟筋とされる"},
+    {"id":"nei","name":"根井氏","prov":"shinano","lean":"kiso","nabiki":5,"kyogata":20,"troops":250,"color":"#3e8a6e","policy":"源氏寄り","conf":"推定","base":{"id":"nei_yakata","name":"根井館（佐久）","x":967.2,"y":675.1,"lat":36.24,"lon":138.47,"def":10,"gar":120},"hold":[["nei_go","根井（佐久郡）","郡郷",2400]],"leader":["yukichika","根井行親","ねのいゆきちか",null,1184,{"command":60,"valor":70,"politics":35,"intellect":40,"diplomacy":35},"勇猛"],"note":"佐久の武士。義仲の挙兵を支えた（義仲四天王の一人とも）","prefer":"kiso"},
+    {"id":"yoda","name":"依田氏","prov":"shinano","lean":"kiso","nabiki":5,"kyogata":20,"troops":250,"color":"#3a7f66","policy":"源氏寄り","conf":"推定","base":{"id":"yoda_jo","name":"依田城","x":946.6,"y":662.7,"lat":36.35,"lon":138.25,"def":12,"gar":130},"hold":[["yoda_sho","依田荘","荘園",2400]],"leader":["yoda_soryo","依田氏の惣領（名は不詳）","よだし",null,null,{"command":45,"valor":50,"politics":40,"intellect":40,"diplomacy":40},"実直"],"note":"小県の依田荘。義仲が依田城を拠り所とした時期の在地勢力。当主名は不詳","prefer":"kiso"},
+    {"id":"unno","name":"海野氏","prov":"shinano","lean":null,"nabiki":35,"kyogata":15,"troops":250,"color":"#4a8a7a","policy":"源氏寄り","conf":"史実","base":{"id":"unno_yakata","name":"海野館","x":957.8,"y":657.7,"lat":36.39,"lon":138.37,"def":10,"gar":120},"hold":[["unno_go","海野郷","郡郷",2400]],"leader":["yukihiro","海野幸広","うんのゆきひろ",null,1183,{"command":55,"valor":60,"politics":40,"intellect":45,"diplomacy":40},"律儀"],"note":"滋野氏の一族。義仲方として水島で戦死。子の幸氏はのち鎌倉方へ（史実）","prefer":"kiso"},
+    {"id":"nishina","name":"仁科氏","prov":"shinano","lean":null,"nabiki":15,"kyogata":15,"troops":250,"color":"#4f7a6a","policy":"静観","conf":"推定","base":{"id":"nishina_yakata","name":"仁科館（安曇）","x":909,"y":646,"lat":36.5,"lon":137.85,"def":10,"gar":120},"hold":[["nishina_mikuriya","仁科御厨","御厨",2200]],"leader":["moriie","仁科盛家","にしなもりいえ",null,null,{"command":50,"valor":55,"politics":40,"intellect":40,"diplomacy":35},"剛直"],"note":"安曇郡の在地領主。義仲軍の武将として伝わる","prefer":"kiso"},
+    {"id":"suwa","name":"諏訪氏（諏訪社）","prov":"shinano","lean":null,"nabiki":25,"kyogata":20,"troops":300,"color":"#7a6a4f","policy":"静観","conf":"推定","base":{"id":"suwa_taisha","name":"諏訪社","x":931.4,"y":695.8,"lat":36.07,"lon":138.09,"def":12,"gar":150,"type":"寺社"},"hold":[["suwa_shinryo","諏訪社領","社領",3000]],"leader":["suwa_hafuri","諏訪大祝（名は不詳）","すわのおおほうり",null,null,{"command":40,"valor":45,"politics":55,"intellect":55,"diplomacy":50},"厳格"],"note":"諏訪社の神官と武士団。神社勢力と武士領主の性格を併せ持つ","prefer":"kiso"},
+    {"id":"kasahara","name":"笠原氏","prov":"shinano","lean":"heike","nabiki":5,"kyogata":30,"troops":250,"color":"#8a3a3a","policy":"平家に従う","conf":"史実","base":{"id":"kasahara_yakata","name":"笠原館","x":952,"y":621.1,"lat":36.7,"lon":138.31,"def":10,"gar":120},"hold":[["kasahara_go","笠原（水内郡）","郡郷",2000]],"leader":["yorinao","笠原頼直","かさはらよりなお",null,null,{"command":50,"valor":55,"politics":35,"intellect":40,"diplomacy":30},"頑固"],"note":"平家方。1180年の市原合戦で義仲方と戦った（史実）"},
+    {"id":"murayama","name":"村山氏","prov":"shinano","lean":null,"nabiki":10,"kyogata":10,"troops":180,"color":"#5a7a5f","policy":"源氏寄り","conf":"推定","base":{"id":"murayama_yakata","name":"村山館","x":948.3,"y":626,"lat":36.66,"lon":138.27,"def":8,"gar":90},"hold":[["murayama_go","村山（水内郡）","郡郷",1600]],"leader":["yoshinao_m","村山義直","むらやまよしなお",null,null,{"command":50,"valor":60,"politics":30,"intellect":35,"diplomacy":30},"勇猛"],"note":"義仲方の武将として笠原勢と戦ったと伝わる","prefer":"kiso"},
+    {"id":"ishiguro","name":"石黒党","prov":"etchu","lean":null,"nabiki":10,"kyogata":20,"troops":350,"color":"#6a8a4a","policy":"静観","conf":"推定","base":{"id":"ishiguro_yakata","name":"石黒館（砺波）","x":817.3,"y":642.5,"lat":36.56,"lon":136.87,"def":10,"gar":150},"hold":[["ishiguro_sho","石黒荘","荘園",3000]],"leader":["mitsuhiro","石黒光弘","いしぐろみつひろ",null,null,{"command":50,"valor":55,"politics":45,"intellect":50,"diplomacy":45},"慎重"],"note":"砺波の武士団（福光・高楯・井口など諸家の連合）。倶利伽羅越えで義仲軍を案内したと伝わる","prefer":"kiso"},
+    {"id":"miyazaki","name":"宮崎党","prov":"etchu","lean":null,"nabiki":10,"kyogata":20,"troops":300,"color":"#5f8a4f","policy":"静観","conf":"推定","base":{"id":"miyazaki_jo","name":"宮崎城","x":885.1,"y":591.8,"lat":36.96,"lon":137.6,"def":12,"gar":130},"hold":[["sami_sho","佐味荘","荘園",2600]],"leader":["nagayasu","宮崎長康","みやざきながやす",null,null,{"command":50,"valor":55,"politics":40,"intellect":45,"diplomacy":40},"剛直"],"note":"越中東部の武士団（入善・別符・南保など）。義仲を支援した","prefer":"kiso"},
+    {"id":"hayashi","name":"林氏（加賀）","prov":"kaga","lean":null,"nabiki":10,"kyogata":25,"troops":250,"color":"#7a8a4a","policy":"静観","conf":"推定","base":{"id":"hayashi_yakata","name":"林館（加賀）","x":787.4,"y":653.4,"lat":36.48,"lon":136.55,"def":10,"gar":120},"hold":[["hayashi_go","林郷","郡郷",2400]],"leader":["mitsuaki","林光明","はやしみつあき",null,null,{"command":50,"valor":55,"politics":40,"intellect":40,"diplomacy":35},"勇猛"],"note":"加賀の義仲方の在地武士（藤島・稲津など）。軍記・地域伝承による人物を含む","prefer":"kiso"},
+    {"id":"echizen_saito","name":"越前斎藤氏","prov":"echizen","lean":null,"nabiki":10,"kyogata":30,"troops":250,"color":"#7a7a4a","policy":"静観","conf":"推定","base":{"id":"saito_yakata","name":"斎藤館（越前）","x":759,"y":704.1,"lat":36.05,"lon":136.25,"def":10,"gar":120},"hold":[["echizen_go","越前の郷","郡郷",2600]],"leader":["saito_soryo","越前斎藤氏の惣領（名は不詳）","さいとうし",null,null,{"command":45,"valor":50,"politics":40,"intellect":40,"diplomacy":40},"慎重"],"note":"越前の在地武士。地域ごとに義仲方へ参加した。当主名は不詳","prefer":"kiso"},
+    {"id":"yamamoto_o","name":"近江源氏・山本氏","prov":"omi","lean":null,"nabiki":35,"kyogata":30,"troops":350,"color":"#4a6a9a","policy":"源氏寄り","conf":"史実","base":{"id":"yamamoto_jo","name":"山本城","x":753.5,"y":775.4,"lat":35.42,"lon":136.2,"def":12,"gar":150},"hold":[["yamamoto_go","山本（浅井郡）","郡郷",3000]],"leader":["yoshitsune_y","山本義経","やまもとよしつね",null,null,{"command":55,"valor":60,"politics":40,"intellect":45,"diplomacy":40},"剛毅"],"note":"近江源氏。1180年に柏木義兼らと近江で平家に反した（史実）","prefer":"kiso"},
+    {"id":"iga_heishi","name":"伊賀平氏（平田家継）","prov":"iga","lean":"heike","nabiki":3,"kyogata":40,"troops":400,"color":"#9b2c2c","policy":"平家に従う","conf":"史実","base":{"id":"hirata_yakata","name":"平田館（伊賀）","x":746.1,"y":848.4,"lat":34.77,"lon":136.13,"def":12,"gar":180},"hold":[["hirata_go","平田（伊賀郡）","郡郷",3200]],"leader":["ietsugu","平田家継","ひらたいえつぐ",null,1184,{"command":55,"valor":60,"politics":45,"intellect":45,"diplomacy":40},"頑固"],"note":"伊賀の平家家人。平家都落ちののち三日平氏の乱で討たれる（史実）"},
+    {"id":"tada","name":"多田源氏","prov":"settsu","lean":"heike","nabiki":25,"kyogata":40,"troops":300,"color":"#5a5a9a","policy":"平家に従う","conf":"史実","base":{"id":"tada_yakata","name":"多田館","x":679.5,"y":838.9,"lat":34.88,"lon":135.41,"def":12,"gar":150},"hold":[["tada_sho","多田荘","荘園",3400]],"leader":["yukitsuna","多田行綱","ただゆきつな",null,null,{"command":55,"valor":55,"politics":55,"intellect":55,"diplomacy":50},"変節"],"note":"摂津源氏。平家に従うが、寿永2年に義仲に呼応するなど去就を変えた（史実）"},
+    {"id":"yamaga","name":"山鹿氏","prov":"chikuzen","lean":"heike","nabiki":3,"kyogata":30,"troops":500,"color":"#8b2b2b","policy":"平家に従う","conf":"史実","base":{"id":"yamaga_jo","name":"山鹿城（遠賀）","x":247.3,"y":981,"lat":33.89,"lon":130.66,"def":14,"gar":220},"hold":[["onga_gun","遠賀郡","郡郷",3600]],"leader":["hidetoo","山鹿秀遠","やまがひでとお",null,null,{"command":60,"valor":65,"politics":40,"intellect":45,"diplomacy":40},"剛直"],"note":"遠賀川流域の大武士団で平家水軍の将（史実）","navy":true},
+    {"id":"harada","name":"原田氏","prov":"chikuzen","lean":"heike","nabiki":3,"kyogata":30,"troops":450,"color":"#8f3030","policy":"平家に従う","conf":"史実","base":{"id":"harada_yakata","name":"原田館（怡土）","x":206.9,"y":1023,"lat":33.55,"lon":130.2,"def":14,"gar":200},"hold":[["ito_gun","怡土・志摩郡","郡郷",3400]],"leader":["tanenao","原田種直","はらだたねなお",null,null,{"command":60,"valor":60,"politics":50,"intellect":50,"diplomacy":45},"忠義"],"note":"大宰少弐。北部九州の平家方の有力武士（史実）"},
+    {"id":"kama_s","name":"嘉摩氏","prov":"chikuzen","lean":"heike","nabiki":5,"kyogata":25,"troops":200,"color":"#933838","policy":"平家に従う","conf":"史実","base":{"id":"kama_yakata","name":"嘉摩館","x":252.9,"y":1016.5,"lat":33.57,"lon":130.71,"def":8,"gar":100},"hold":[["kama_gun","嘉摩郡","郡郷",1800]],"leader":["tanemasu","嘉摩種益","かまたねます",null,null,{"command":45,"valor":50,"politics":35,"intellect":35,"diplomacy":30},"実直"],"note":"『吾妻鏡』に平家方の有力武士として見える"},
+    {"id":"katsuki","name":"香月氏","prov":"chikuzen","lean":"heike","nabiki":5,"kyogata":25,"troops":180,"color":"#963a3a","policy":"平家に従う","conf":"推定","base":{"id":"katsuki_yakata","name":"香月館","x":253.8,"y":987.1,"lat":33.83,"lon":130.73,"def":8,"gar":90},"hold":[["katsuki_sho","香月荘","荘園",1600]],"leader":["hidenori","香月秀則","かつきひでのり",null,null,{"command":45,"valor":50,"politics":35,"intellect":35,"diplomacy":30},"実直"],"note":"遠賀郡香月荘の庄司。平家方"},
+    {"id":"itai","name":"板井氏","prov":"buzen","lean":"heike","nabiki":5,"kyogata":25,"troops":220,"color":"#993c3c","policy":"平家に従う","conf":"史実","base":{"id":"itai_yakata","name":"板井館","x":276.8,"y":999.7,"lat":33.7,"lon":130.98,"def":8,"gar":100},"hold":[["nakatsu_gun","仲津郡","郡郷",2000]],"leader":["tanetoo","板井種遠","いたいたねとお",null,null,{"command":50,"valor":55,"politics":35,"intellect":40,"diplomacy":30},"頑固"],"note":"『吾妻鏡』に見える豊前の平家方武士"},
+    {"id":"nagano_b","name":"長野氏（豊前）","prov":"buzen","lean":"heike","nabiki":5,"kyogata":25,"troops":200,"color":"#9c3f3f","policy":"平家に従う","conf":"推定","base":{"id":"nagano_yakata","name":"長野館（企救）","x":269.2,"y":985.7,"lat":33.83,"lon":130.9,"def":8,"gar":100},"hold":[["kiku_nagano","長野荘（企救郡）","荘園",1800]],"leader":["yasumori","長野康盛","ながのやすもり",null,null,{"command":45,"valor":50,"politics":35,"intellect":35,"diplomacy":30},"慎重"],"note":"北九州の平家方の在地領主"},
+    {"id":"moji","name":"門司関","prov":"buzen","lean":"heike","nabiki":3,"kyogata":30,"troops":200,"color":"#a04040","policy":"平家に従う","conf":"推定","base":{"id":"moji_seki","name":"門司関","x":274.2,"y":971.8,"lat":33.95,"lon":130.96,"def":12,"gar":120,"type":"港"},"hold":[["moji_go","門司の関所領","郡郷",1600]],"leader":["moji_betto","門司関別当（名は不詳）","もじのせきべっとう",null,null,{"command":40,"valor":45,"politics":40,"intellect":40,"diplomacy":35},"実直"],"note":"関門海峡の関所の勢力。平家方","navy":true},
+    {"id":"usa","name":"宇佐氏（宇佐宮）","prov":"buzen","lean":"heike","nabiki":10,"kyogata":40,"troops":300,"color":"#8a5a3a","policy":"平家に従う","conf":"史実","base":{"id":"usa_jingu","name":"宇佐宮","x":312.7,"y":1015.8,"lat":33.53,"lon":131.37,"def":10,"gar":150,"type":"寺社"},"hold":[["usa_shinryo","宇佐宮領","社領",3600]],"leader":["kinmichi","宇佐公通","うさきんみち",null,null,{"command":40,"valor":40,"politics":60,"intellect":60,"diplomacy":55},"老練"],"note":"宇佐宮の大宮司。平家と結んだ（史実）"},
+    {"id":"matsura","name":"松浦党","prov":"hizen","lean":"heike","nabiki":10,"kyogata":25,"troops":450,"color":"#3a5a8a","policy":"平家に従う","conf":"推定","base":{"id":"matsura_yakata","name":"松浦館","x":178.7,"y":1046,"lat":33.37,"lon":129.88,"def":12,"gar":200},"hold":[["matsura_gun","松浦郡","郡郷",3200]],"leader":["matsura_soryo","松浦党の惣領（名は不詳）","まつらとう",null,null,{"command":55,"valor":60,"politics":40,"intellect":45,"diplomacy":40},"剛直"],"note":"肥前・壱岐・対馬の海の武士団の連合。平家水軍に加わった系統がある","navy":true},
+    {"id":"aso","name":"阿蘇氏（阿蘇社）","prov":"higo","lean":null,"nabiki":30,"kyogata":20,"troops":350,"color":"#6a6a3a","policy":"静観","conf":"推定","base":{"id":"aso_jinja","name":"阿蘇社","x":291.8,"y":1082.8,"lat":32.95,"lon":131.12,"def":12,"gar":150,"type":"寺社"},"hold":[["aso_shinryo","阿蘇社領","社領",3600]],"leader":["aso_daiguji","阿蘇大宮司（名は不詳）","あそだいぐうじ",null,null,{"command":45,"valor":50,"politics":55,"intellect":55,"diplomacy":50},"厳格"],"note":"神職と武士団を兼ねる。反平家の動きと関わる","prefer":"kikuchi"},
+    {"id":"ogata","name":"緒方氏","prov":"bungo","lean":null,"nabiki":60,"kyogata":15,"troops":450,"color":"#4a6a4a","policy":"源氏寄り","conf":"史実","base":{"id":"ogata_yakata","name":"緒方館","x":323.5,"y":1077.9,"lat":32.97,"lon":131.47,"def":12,"gar":200},"hold":[["ogata_sho","緒方荘","荘園",3400]],"leader":["koreyoshi_g","緒方惟栄","おがたこれよし",null,null,{"command":65,"valor":65,"politics":45,"intellect":50,"diplomacy":45},"剛毅"],"note":"豊後の武士団を率い、平家追討に協力した（史実）"},
+    {"id":"shinobu_sato","name":"信夫佐藤氏","prov":"mutsu","lean":"oshu","nabiki":10,"kyogata":10,"troops":300,"color":"#3a7a3a","policy":"主家に従う","conf":"史実","base":{"id":"ohtori_jo","name":"大鳥城（信夫）","x":1154.9,"y":490.1,"lat":37.78,"lon":140.45,"def":12,"gar":150},"hold":[["shinobu_sho","信夫荘","荘園",3400]],"leader":["motoharu","佐藤基治","さとうもとはる",null,null,{"command":55,"valor":55,"politics":50,"intellect":50,"diplomacy":45},"忠義"],"note":"奥州藤原氏の家臣（信夫庄司）。子の継信・忠信は義経に従う（史実）"}
+  ];
+  // 既存の勢力・家のなびきやすさ（隠し値）
+  var NABIKI0 = { kikuchi: 25, kono: 30, chiba: 92, kazusa: 70, miura: 88, hatakeyama: 45, satake: 8, ashikaga: 12, nitta: 30, ito: 4, oba: 4, jo: 8, kiso: 0, kai: 0, oshu: 5 };
+  var KYOGATA0 = { kazusa: 5, jo: 35, satake: 20, nitta: 15, ashikaga: 10, hatakeyama: 5, miura: 10, chiba: 5, oba: 30, ito: 20, oshu: 30, wada: 10, kajiwara: 20, adachi: 5, hiki: 5, hojo: 0, kai: 25, kiso: 40 };
+  // 承久の乱で京方についた人物（家の当主になったときに家ごと京方になびく）。いない人物は効果なし
+  var KYOGATA_P = { chikahiro: 88, tanenobu: 85, hirotsuna: 85, motokiyo: 80, koreyoshi_o: 80, morituna_o: 75, shigetada_y: 85, hideyasu: 95 };
+  function clanPerson(s, a, fid, loc, extra) {
+    if (s.persons[a[0]]) return s.persons[a[0]];
+    var p = s.persons[a[0]] = { id: a[0], name: a[1], kana: a[2], born: a[3], died: a[4], birthConfidence: a[3] ? '史実' : '要確認', faction: fid, location: loc, status: extra || '当主', rank: '', courtOffices: [], warriorOffices: [], abilities: a[5], abilitiesConfidence: 'ゲーム設定', personality: a[6], ambition: 40, loyalty: 80, alive: true, health: 100, note: a[7] || '', relations: [], naturalDeath: a[4] ? { y: a[4], m: a[4] === 1180 ? 10 : 6, d: a[4] === 1180 ? 14 : 1 } : null, captiveOf: null };
+    return p;
+  }
+  function migrateClans(s) {
+    if (s.flags.clans >= 2) return; s.flags.clans = 2;
+    if (!s.provinces.awa_t || !s.factions.heike) return;
+    CLANS.forEach(function (c) {
+      if (s.factions[c.id] || s.bases[c.base.id] || !s.provinces[c.prov]) return;
+      if (c.leader[4] && c.leader[4] < s.date.y) return; // すでに没している家は置かない（後の年代から始めた場合）
+      var lead = clanPerson(s, c.leader, c.id, c.base.id); if (c.existing && lead.alive && !Object.keys(s.factions).some(function (k) { return s.factions[k].leader === lead.id; })) { lead.faction = c.id; lead.location = c.base.id; }
+      var f = s.factions[c.id] = { id: c.id, name: c.name, type: c.type || (KANTO_P.indexOf(c.prov) >= 0 ? '東国武士団（在地）' : '在地の武士団'), color: c.color, leader: lead.id, capital: c.base.id, money: 150, food: Math.round(c.troops * 6), policy: c.policy, ambition: 35, courtRelation: 20, playable: false, status: '在地', description: c.note, overlord: c.lean, flags: {}, legitimacy: 20, heir: null, alive: true, navy: c.prov === 'awa_t' || !!c.navy, prefer: c.prefer || null, ai: { lastEval: -99, posture: 'normal', target: null, memo: '' }, nabiki: c.nabiki, kyogata: c.kyogata, clan: true };
+      f.regime = regimeBase(f); f.regime.confidence = 'ゲーム設定'; f.regime.goal = '家の存続'; f.regime.lastAct = null;
+      if (s.date.y >= 1186 && KANTO_P.indexOf(c.prov) >= 0) { var bk0 = Object.keys(s.factions).filter(function (k) { return s.factions[k].alive && !s.factions[k].overlord && (s.factions[k].flags || {}).bakufu; })[0]; f.overlord = bk0 || null; if (bk0) { var rb0 = rel(s, c.id, bk0); rb0.status = '主従'; rb0.value = 50; f.pledgedDay = s.day; } } // 後の年代のセーブ：すでに幕府の御家人
+      else if (c.lean) { var r = rel(s, c.id, c.lean); r.status = '主従'; r.value = 40; f.pledgedDay = -200; }
+      s.bases[c.base.id] = { id: c.base.id, name: c.base.name, province: c.prov, type: c.base.type || '館', owner: c.id, defense: c.base.def, maxDefense: c.base.def, garrison: c.base.gar, x: c.base.x, y: c.base.y, lat: c.base.lat, lon: c.base.lon, confidence: c.conf, note: c.note };
+      if (c.base2) s.bases[c.base2.id] = { id: c.base2.id, name: c.base2.name, province: c.base2.prov, type: '館', owner: c.id, defense: c.base2.def, maxDefense: c.base2.def, garrison: c.base2.gar, x: c.base2.x, y: c.base2.y, lat: c.base2.lat, lon: c.base2.lon, confidence: 'ゲーム設定', note: '一族の分かれた館' };
+      var bid = 'band_' + c.id; s.bands[bid] = { id: bid, faction: c.id, province: c.prov, name: c.name.replace(/（.*）/, '') + 'の兵', strength: c.troops, base: c.troops, mobilized: 0, confidence: '推定' };
+      c.hold.forEach(function (h) { if (s.holdings[h[0]]) return; var x = s.holdings[h[0]] = { id: h[0], name: h[1], province: h[4] || c.prov, type: h[2], proprietor: h[2] === '国衙領' ? '国衙' : '—', controller: c.id, output: h[3], confidence: '推定', note: '' };
+        x.rights = { honjo: (SHARES[x.type] || {}).honjo === 0 ? null : 'court', taxHolder: c.id, jito: null }; x.oryo = false; });
+      (c.members || []).forEach(function (m) { var p = clanPerson(s, m, c.id, c.base.id, '一族'); p.note = m[7] || p.note; p.relations.push({ person: lead.id, type: '兄弟' }); lead.relations.push({ person: p.id, type: '兄弟' }); });
+      Object.keys(s.factions).forEach(function (k) { if (f.overlord && k !== c.id && atWar(s, k, f.overlord)) rel(s, c.id, k).war = true; });
+    });
+    Object.keys(NABIKI0).forEach(function (k) { if (s.factions[k] && s.factions[k].nabiki == null) s.factions[k].nabiki = NABIKI0[k]; });
+    Object.keys(KYOGATA0).forEach(function (k) { if (s.factions[k] && s.factions[k].kyogata == null) s.factions[k].kyogata = KYOGATA0[k]; if (s.houses && s.houses[k] && s.houses[k].kyogata == null) s.houses[k].kyogata = KYOGATA0[k]; });
+  }
+  function nabikiOf(s, fid) { var f = F(s, fid); return f ? (f.nabiki == null ? 40 : f.nabiki) : 0; }
+  // 家・御家人の京方への傾き：家の値と当主の値の大きいほう（当主が京方に心を寄せていれば家ごとなびく）
+  function kyogataOf(s, r) {
+    var o = r.kind === 'house' ? H(s, r.id) : F(s, r.id); if (!o) return 0;
+    var head = Pn(s, r.kind === 'house' ? o.head : o.leader), ph = head && head.alive ? (head.kyogata != null ? head.kyogata : KYOGATA_P[head.id] || 0) : 0;
+    return Math.max(o.kyogata || 0, ph);
+  }
+
+  // ---- 従属の申し出：頼朝方（プレイヤー）の大軍が近くを通ると、なびきやすい家が自ら使者を送ってくる
+  function offerPending(s, fid) { return s.pendingStops.some(function (e) { return e.key === 'submission' && e.faction === fid && !e.resolved; }); }
+  function offerSubmission(s, fid, lord, why) {
+    var f = F(s, fid); if (!f || !f.alive || offerPending(s, fid)) return null;
+    f.lastOffer = s.day; var cap = B(s, f.capital), tr = availableBandTroops(s, fid);
+    news(s, '【従属の申し出】' + f.name + 'が' + fname(s, lord) + 'のもとへ使者を送り、従属を申し出た。' + (why || ''), { type: 'politics', important: true, factions: [fid, lord] });
+    return stop(s, { key: 'submission', faction: fid, lord: lord, title: f.name.replace(/（.*）/, '') + 'の従属の申し出', persons: [f.leader].filter(Boolean), place: cap ? cap.name : '',
+      text: (Pn(s, f.leader) ? Pn(s, f.leader).name : f.name) + 'が使者を送ってきた。「' + fname(s, lord).replace(/（.*）/, '') + '殿の御陣に加わりたい」という。\n本拠：' + (cap ? cap.name + '（' + PV(s, cap.province).name + '）' : 'なし') + '　兵：約' + tr + '　' + (f.overlord ? '今の主：' + fname(s, f.overlord) : '独立の家') + (why ? '\n' + why : ''),
+      choices: [{ id: 'accept', label: '従属を受け入れる（御家人とする）' }, { id: 'decline', label: '断る' }] });
+  }
+  function resolveSubmission(s, ev, choiceId) {
+    var f = F(s, ev.faction); if (!f || !f.alive) return 'その家はもうない';
+    if (choiceId === 'decline') { var r0 = rel(s, f.id, ev.lord); r0.value = clamp(r0.value - 15, -100, 100); return f.name + 'の申し出を断った'; }
+    changeAllegiance(s, f.id, ev.lord, '自ら従属を申し出た');
+    var r = rel(s, f.id, ev.lord); r.value = Math.max(r.value, 60); return f.name + 'を御家人として迎えた（本拠と所領はその家のまま）';
+  }
+  function nabikiTick(s) {
+    var lord = s.playerFaction, L = F(s, lord); if (!L || !L.alive || L.overlord) return;
+    if (['挙兵', '幕府'].indexOf(L.status) < 0 && !(L.flags || {}).bakufu) return;
+    if (s.day % 3 !== 0) return;
+    var big = Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return topLord(s, a.faction) === lord && a.troops >= 800; });
+    if (!big.length) return;
+    Object.keys(s.factions).forEach(function (fid) {
+      var f = s.factions[fid]; if (!f.alive || fid === lord || topLord(s, fid) === lord || fid === 'heike' || fid === 'court') return;
+      if (f.type.indexOf('武士団') < 0 && f.type.indexOf('国衙') < 0 && f.type.indexOf('地方') < 0) return;
+      if (f.lastOffer != null && s.day - f.lastOffer < 90) return; if (offerPending(s, fid)) return;
+      if (histMode(s) && (s.histEvents || []).some(function (e) { return e.status === 'pending' && (e.effects || []).some(function (x) { return x.action === 'join' && x.faction === fid; }); })) return;
+      var cap = B(s, f.capital); if (!cap || !alive(s, f.leader)) return;
+      if (Object.keys(s.armies).some(function (k) { var a = s.armies[k]; return a.faction === fid && a.battleId; })) return;
+      var near = big.filter(function (a) { return distProv(s, cap.province, a.province) <= 120; }).sort(function (a, b) { return b.troops - a.troops; })[0];
+      if (!near) return;
+      var own = campPower(s, fid), lordF = f.overlord ? topLord(s, f.overlord) : null;
+      if (lordF && lordF !== fid) { own = Math.max(own * 0.25, factionPower(s, fid).available + factionPower(s, fid).garrison); } // 遠い主君の力は頼りにならない
+      var pressure = clamp(near.troops / Math.max(200, own) / 2, 0.3, 1.6), nb = nabikiOf(s, fid);
+      var p = nb / 100 * 0.3 * pressure;
+      if (lordF === 'heike' && rel(s, fid, f.overlord).value > 40) p *= 0.6;
+      if (rel(s, fid, lord).war && rel(s, fid, lord).value < -30) p *= 0.5;
+      if (rand(s) < p) offerSubmission(s, fid, lord, armyLabel(s, near) + '（' + near.troops + '）が' + PV(s, near.province).name + 'に来ている');
+    });
+  }
+  // ---- 京方：朝廷（院）が幕府方に追討を下すと、京方になびきやすい家・御家人は京方につく
+  function kyogataRally(s, target, requester) {
+    var tl = topLord(s, target), out = [], jokyu = s.court && s.court.lastJokyu === s.day;
+    var side = requester && F(s, requester) && F(s, requester).alive && topLord(s, requester) !== tl ? topLord(s, requester) : 'court';
+    var cand = [];
+    Object.keys(s.factions).forEach(function (k) { var f = s.factions[k]; if (f.alive && k !== tl && topLord(s, k) === tl && k !== 'court') cand.push({ kind: 'vassal', id: k, lord: f.overlord }); });
+    Object.keys(s.houses || {}).forEach(function (k) { var h = s.houses[k]; if (!h.asFaction && h.head && alive(s, h.head) && topLord(s, h.faction) === tl) cand.push({ kind: 'house', id: k, lord: h.faction }); });
+    cand.forEach(function (r) {
+      var kg = kyogataOf(s, r); if (kg <= 0) return;
+      var Ly = F(s, r.lord) ? retLoyalty(s, r, r.lord) : 50;
+      var p = kg / 100 * (jokyu ? 0.9 : 0.45) * (1 - clamp((Ly - 50) / 100, 0, 0.5));
+      if (rand(s) >= p) return;
+      var fid = r.kind === 'house' ? (houseToFaction(s, r.id) || {}).id : r.id; if (!fid) return;
+      changeAllegiance(s, fid, side, '朝廷の追討に応じて京方についた');
+      var x = rel(s, fid, tl); x.war = true; x.status = '敵対'; x.value = Math.min(x.value, -40);
+      if (side === 'court') { var cr = rel(s, 'court', tl); cr.war = true; cr.status = '敵対'; }
+      out.push(fid);
+    });
+    if (out.length) {
+      news(s, '【京方】' + out.map(function (k) { return fname(s, k).replace(/（.*）/, ''); }).join('・') + 'が朝廷の追討に応じ、京方についた', { type: 'court', important: true, factions: out.concat([tl]) });
+      if (s.playerFaction && topLord(s, s.playerFaction) === tl) stop(s, { key: 'kyogata', title: '京方につく家', persons: out.map(function (k) { return F(s, k).leader; }).filter(Boolean).slice(0, 6), text: '朝廷の追討を受けて、' + out.map(function (k) { return fname(s, k); }).join('・') + 'が京方についた。家の所領と兵はその家とともに離れる。', choices: [] });
+    }
+    return out;
+  }
+  // ---- 承久の乱：後鳥羽院が幕府の執権（またはその主）に追討を下す
+  function jokyuTick(s) {
+    if (s.flags.jokyu) return; var gb = Pn(s, 'gotoba'); if (!gb || !gb.alive) return;
+    var bk = Object.keys(s.factions).filter(function (k) { var f = s.factions[k]; return f.alive && !f.overlord && (f.flags || {}).bakufu; })[0]; if (!bk) return;
+    var hj = s.factions.hojo && s.factions.hojo.alive ? 'hojo' : bk;
+    var due = cmpDate(s.date, { y: 1221, m: 5, leap: false, d: 15 }) >= 0, early = cmpDate(s.date, { y: 1219, m: 2, leap: false, d: 1 }) >= 0;
+    if (!(histMode(s) ? due : due || (early && s.date.d === 1 && rand(s) < 0.05))) return;
+    s.flags.jokyu = s.day; ensureCourt(s); s.court.lastJokyu = s.day;
+    news(s, '【承久の乱】後鳥羽院が' + fname(s, hj) + '追討の院宣・官宣旨を下した。京方につく武士を募る', { type: 'court', important: true, factions: [hj, bk] });
+    issueTsuito(s, hj, 'court');
+  }
+  // ---- 御家人の序列：官位・官職・役職、功績、所領の石高、兵力を点数にして並べる
+  function retKoku(s, r) { return Object.keys(s.holdings).reduce(function (t, k) { var h = s.holdings[k]; return t + ((r.kind === 'house' ? h.house === r.id : h.controller === r.id && !h.house) ? h.output : 0); }, 0); }
+  function retTroops(s, r) { return r.kind === 'house' ? houseTroops(s, r.id) + Object.keys(s.armies).reduce(function (t, k) { var a = s.armies[k]; return t + (a.house === r.id ? a.troops : 0); }, 0) : (function () { var p = factionPower(s, r.id); return p.available + p.field; })(); }
+  function meritOf(s, lord, id) { return ((s.merit || {})[lord] || {})[id] || 0; }
+  function personKan(p) {
+    if (!p) return 0; var v = (p.rank && /五位/.test(p.rank) ? 6 : p.rank && /四位/.test(p.rank) ? 10 : p.rank && /[三二一]位/.test(p.rank) ? 15 : 0);
+    (p.courtOffices || []).forEach(function (o) { v += /大臣|納言|参議|卿/.test(o) ? 15 : /守$/.test(o) ? 8 : /検非違使/.test(o) ? 6 : /介$/.test(o) ? 5 : /尉|允|佐$/.test(o) ? 4 : 2; });
+    (p.warriorOffices || []).forEach(function (o) { v += /執権|別当|守護/.test(o) ? 10 : /地頭|奉行|所司|寄人|執事/.test(o) ? 5 : 3; });
+    return v;
+  }
+  function gokeninRanking(s, fid) {
+    var list = retainersOf(s, fid).map(function (r) {
+      var o = r.kind === 'house' ? H(s, r.id) : F(s, r.id), headId = r.kind === 'house' ? o.head : o.leader;
+      var ms = r.kind === 'house' ? o.members.map(function (m) { return Pn(s, m); }) : factionPersons(s, r.id);
+      var kan = personKan(Pn(s, headId)) + ms.filter(function (p) { return p && p.alive && p.id !== headId; }).reduce(function (t, p) { return t + personKan(p) * 0.3; }, 0);
+      var instF = (F(s, fid) || {}).institutions || {}, sgx = s.shogunate || {}, offT = [];
+      Object.keys(instF).forEach(function (k) { var ins = instF[k]; if (ins && ins.head && ms.some(function (p) { return p && p.alive && p.id === ins.head; })) { kan += 14; offT.push((INSTITUTIONS[k] || {}).name + (INSTITUTIONS[k] || {}).head); } });
+      if (sgx.shikken && sgx.shikken.holder === r.id) { kan += 25; offT.push('執権'); } if (sgx.rensho && sgx.rensho.holder === r.id) { kan += 15; offT.push('連署'); }
+      var merit = meritOf(s, fid, r.id), koku = retKoku(s, r), troops = retTroops(s, r), L = retLoyalty(s, r, fid);
+      var kin = kinship(s, fid, r), senjin = (o.senjinCount || 0);
+      var score = kan * 2 + merit * 3 + senjin * 4 + koku / 400 + troops / 60 + (kin === 'blood' ? 8 : kin === 'inlaw' ? 5 : 0) + (o.granted != null ? 3 : 0);
+      return { kind: r.kind, id: r.id, name: retName(s, r), head: headId, kan: Math.round(kan), merit: Math.round(merit * 10) / 10, koku: Math.round(koku), troops: Math.round(troops), loyalty: Math.round(L), kin: kin, score: Math.round(score * 10) / 10, titles: offT.concat(ms.filter(function (p) { return p && p.alive; }).reduce(function (t, p) { return t.concat(p.courtOffices || [], p.warriorOffices || []); }, [])).filter(function (x, i, a) { return a.indexOf(x) === i; }).slice(0, 4) };
+    });
+    list.sort(function (a, b) { return b.score - a.score; }); list.forEach(function (x, i) { x.rankNo = i + 1; });
+    return list;
+  }
   function migrateHouses4(s) { if (s.flags.houseModel >= 4) return; s.flags.houseModel = 4; var h = s.houses.hiki; if (!h || h.seat || !s.holdings.hiki_go) return; var hd = s.holdings.hiki_go;
     var any = Object.keys(s.bases).map(function (k) { return s.bases[k]; }).filter(function (b) { return b.province === hd.province; })[0], pv = PV(s, hd.province);
     s.bases.hiki_kan = { id: 'hiki_kan', name: '比企館', province: hd.province, type: '館', owner: hd.controller, house: 'hiki', defense: 25, maxDefense: 25, garrison: 20, x: (any ? any.x : pv.x) - 14, y: (any ? any.y : pv.y) + 10, confidence: '推定', note: '比企氏の本領・比企郡の館（位置は推定）', facilities: {} };
@@ -1424,6 +2095,7 @@
     var name = retName(s, r), act = cmd.act, target = null, cp = null, lead = null;
     if (act === 'join') { cp = s.corps[cmd.corps]; if (!cp || cp.faction !== fid) return { ok: false, reason: '合流先の軍団を選ぶこと' }; target = cp.target;
       lead = Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return a.corps === cp.id && !a.joinCorps; }).sort(function (a, b) { return b.troops - a.troops; })[0]; if (!lead) return { ok: false, reason: 'その軍団には本隊がいない' }; }
+    else if (act === 'intercept') { var en = s.armies[cmd.enemy]; if (!en || !atWar(s, fid, en.faction)) return { ok: false, reason: '交戦中の敵軍を選ぶこと' }; target = { type: 'province', id: en.province }; }
     else if (act === 'attack' || act === 'defend') { if (!cmd.target || !B(s, cmd.target)) return { ok: false, reason: '拠点を選ぶこと' }; target = { type: 'base', id: cmd.target }; var bo = B(s, cmd.target).owner;
       if (act === 'attack' && (!bo || sameCamp(s, bo, fid))) return { ok: false, reason: '敵の拠点を選ぶこと' }; if (act === 'attack' && !atWar(s, fid, bo)) return { ok: false, reason: fname(s, bo) + 'とは交戦していない' };
       if (act === 'defend' && !sameCamp(s, bo, fid)) return { ok: false, reason: '味方の拠点を選ぶこと' }; }
@@ -1441,7 +2113,7 @@
     if (r.kind === 'house') { var hh = H(s, r.id); hh.loyalty = clamp((hh.loyalty == null ? 50 : hh.loyalty) - 1, 0, 100); } else { var rv0 = rel(s, r.id, fid); rv0.value = clamp(rv0.value - 1, -100, 100); } // たびたびの使い立ては負担になる
     if (dec === 'refuse' || d.avail < 20) { aiLog(s, fid, name + 'に指図（不承知）', d.why); return { ok: true, refused: true, message: name + 'は申し出を断った（' + (d.avail < 20 ? '出せる兵がない' : d.why) + '）' }; }
     var field = r.kind === 'vassal' && act !== 'join' ? Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return a.faction === r.id && !a.joinCorps && !a.lordOrder && (a.status === 'idle' || a.status === 'arrived') && a.troops >= 50; }).sort(function (a, b) { return b.troops - a.troops; })[0] : null;
-    if (field) { var ef = setArmyTarget(s, field, target, act === 'attack' ? 'attack' : 'move'); if (!ef) { field.lordOrder = { lord: fid, act: act, target: target, until: s.day + 120 }; var fm = name + 'は出陣中の' + Math.round(field.troops) + 'を' + (act === 'attack' ? B(s, target.id).name + 'へ向けた' : B(s, target.id).name + 'の守りに回した');
+    if (field) { var ef = setArmyTarget(s, field, target, act === 'attack' || act === 'intercept' ? 'attack' : 'move'); if (!ef) { field.lordOrder = { lord: fid, act: act, target: target, until: s.day + (act === 'intercept' ? 60 : 120) }; if (act === 'intercept') { field.chase = cmd.enemy; field.chaseUntil = s.day + 60; } var fm = name + 'は出陣中の' + Math.round(field.troops) + 'を' + (act === 'intercept' ? armyLabel(s, s.armies[cmd.enemy]) + 'の迎撃に向けた' : act === 'attack' ? B(s, target.id).name + 'へ向けた' : B(s, target.id).name + 'の守りに回した');
         news(s, '【指図】' + fm, { type: 'military', important: true, factions: [fid] }); aiLog(s, fid, name + 'に指図（承知）', d.why); return { ok: true, message: fm }; } }
     var order = B(s, f.capital) ? travelDays(s, B(s, f.capital).province, d.home, 55) : 1, prep = dec === 'late' ? 7 + Math.round(rand(s) * 6) : 2 + Math.round(rand(s) * 2);
     var n = Math.floor(d.avail * (dec === 'late' ? 0.6 : 0.85)), actor = r.kind === 'house' ? fid : r.id, cmdr = r.kind === 'house' ? (H(s, r.id).head && personFree(s, H(s, r.id).head, fid) ? H(s, r.id).head : null) : null;
@@ -1449,15 +2121,15 @@
     var a = typeof m.army === 'string' ? s.armies[m.army] : m.army; a.house = r.kind === 'house' ? r.id : null; a.status = 'gathering'; a.gatherUntil = s.day + order + prep;
     if (act === 'join') { a.joinCorps = cp.id; a.contingentOf = fid; var rvp = rendezvousFor(s, lead, d.home, target.type === 'base' ? B(s, target.id).province : target.id); setArmyTarget(s, a, { type: 'province', id: rvp }, 'move'); a.status = 'gathering';
       cp.contingents = cp.contingents || []; cp.contingents.push({ id: r.id, kind: r.kind, name: name, decision: dec, why: d.why, troops: a.troops, army: a.id, rendezvous: rvp, eta: s.day + order + prep + travelDays(s, d.home, rvp, 25) }); }
-    else { a.lordOrder = { lord: fid, act: act, target: target, until: s.day + 120 }; var e = setArmyTarget(s, a, target, act === 'attack' ? 'attack' : 'move'); if (e) { disbandArmy(s, a, 'home'); return { ok: false, reason: e }; } a.status = 'gathering'; }
-    var msg = name + 'は' + (dec === 'late' ? '遅れて' : '') + a.troops + 'を率いて' + (act === 'join' ? pname(s, cp.commander) + 'の軍団に合流する' : act === 'attack' ? B(s, target.id).name + 'を攻める' : B(s, target.id).name + 'の守りにつく') + '（' + (a.gatherUntil - s.day) + '日後に発つ）';
+    else { a.lordOrder = { lord: fid, act: act, target: target, until: s.day + (act === 'intercept' ? 60 : 120) }; if (act === 'intercept') { a.chase = cmd.enemy; a.chaseUntil = s.day + 60 + (a.gatherUntil - s.day); } var e = setArmyTarget(s, a, target, act === 'attack' || act === 'intercept' ? 'attack' : 'move'); if (e) { disbandArmy(s, a, 'home'); return { ok: false, reason: e }; } a.status = 'gathering'; }
+    var msg = name + 'は' + (dec === 'late' ? '遅れて' : '') + a.troops + 'を率いて' + (act === 'join' ? pname(s, cp.commander) + 'の軍団に合流する' : act === 'intercept' ? armyLabel(s, s.armies[cmd.enemy]) + 'を迎え撃つ' : act === 'attack' ? B(s, target.id).name + 'を攻める' : B(s, target.id).name + 'の守りにつく') + '（' + (a.gatherUntil - s.day) + '日後に発つ）';
     news(s, '【指図】' + msg, { type: 'military', important: true, factions: [fid] }); aiLog(s, fid, name + 'に指図（承知）', d.why);
     return { ok: true, message: msg };
   }
   function lordOrderTick(s) { // 指図を果たした・期限が来た軍は御家人の判断に戻る（功は奉公として記録）
     Object.keys(s.armies).forEach(function (k) { var a = s.armies[k], o = a.lordOrder; if (!o) return; var b = o.target && o.target.type === 'base' ? B(s, o.target.id) : null;
-      var done = o.act === 'attack' && b && sameCamp(s, b.owner, o.lord);
-      if (done) { addService(s, o.lord, a.house || a.faction, 3); news(s, armyLabel(s, a) + 'は指図どおり' + b.name + 'の攻略を果たした（奉公が加わる）', { type: 'military', factions: [o.lord] }); }
+      var done = (o.act === 'attack' && b && sameCamp(s, b.owner, o.lord)) || (o.act === 'intercept' && a.chaseDone);
+      if (done) { addService(s, o.lord, a.house || a.faction, 3); news(s, armyLabel(s, a) + 'は指図どおり' + (b ? b.name + 'の攻略' : '敵軍の撃退') + 'を果たした（奉公が加わる）', { type: 'military', factions: [o.lord] }); }
       if (done || o.until <= s.day || ((a.status === 'idle' || a.status === 'retreating') && o.act === 'attack' && a.morale < 30)) a.lordOrder = null; });
   }
 
@@ -1538,7 +2210,7 @@
         here.troops += a.troops; here.initialTroops += a.troops; here.food += a.food; here.bands = here.bands.concat(a.bands); if (a.commander && here.officers.indexOf(a.commander) < 0) here.officers.push(a.commander); a.officers.forEach(function (o) { if (here.officers.indexOf(o) < 0) here.officers.push(o); });
         here.divisions = (here.divisions || []).concat([{ leader: a.commander, troops: a.troops, house: a.house }]); here.house = here.house || null;
         a.officers.concat(a.commander ? [a.commander] : []).forEach(function (p) { if (s.persons[p]) s.persons[p].location = 'army:' + here.id; });
-        if (rec) { rec.decision = rec.decision === 'late' ? 'late-joined' : 'joined'; rec.joinedDay = s.day; addService(s, a.contingentOf, rec.id, 2 + a.troops / 100); }
+        if (rec) { rec.decision = rec.decision === 'late' ? 'late-joined' : 'joined'; rec.joinedDay = s.day; addService(s, a.contingentOf, rec.id, 1 + Math.min(1, a.troops / 800)); }
         news(s, '【合流】' + (rec ? rec.name : '') + 'の兵' + Math.round(a.troops) + 'が' + PV(s, a.province).name + 'で' + armyLabel(s, here) + 'に加わった（' + Math.round(here.troops) + '）', { type: 'military', factions: [a.faction] });
         delete s.armies[a.id]; return;
       }
@@ -1620,6 +2292,10 @@
   }
   // 将軍家の子と北条の次代（史実の誕生。両親が生きていれば生まれる）
   var BIRTHS = [
+    { id: 'gotoba', date: [1180, 7, 14], parents: ['takakura'], p: { name: '後鳥羽天皇（尊成親王）', kana: 'ごとばてんのう', born: 1180, died: 1239, faction: 'court', status: '高倉院の皇子', abilities: { command: 40, valor: 45, politics: 75, intellect: 85, diplomacy: 60 }, personality: '多才・剛毅', ambition: 85, loyalty: 50, rel: [['takakura', '父子（相手側）']] }, note: '治承4年7月14日誕生（史実）。のち承久の乱を起こす' },
+    { id: 'tanenobu', date: [1185, 1, 1], parents: ['yoshizumi'], house: 'miura', p: { name: '三浦胤義', kana: 'みうらたねよし', born: 1185, died: 1221, faction: null, status: '義澄の子', abilities: { command: 60, valor: 70, politics: 40, intellect: 45, diplomacy: 40 }, personality: '激情', ambition: 60, loyalty: 70, rel: [['yoshizumi', '父子（相手側）']] }, note: '生年は不詳（ゲームでは1185年）。在京して検非違使となり、承久の乱で京方についた（史実）' },
+    { id: 'chikahiro', date: [1186, 1, 1], parents: ['hiromoto'], p: { name: '大江親広', kana: 'おおえのちかひろ', born: 1186, died: 1242, faction: null, status: '広元の嫡男', abilities: { command: 40, valor: 35, politics: 70, intellect: 70, diplomacy: 60 }, personality: '温雅', ambition: 45, loyalty: 70, rel: [['hiromoto', '父子（相手側）']] }, note: '生年は不詳（ゲームでは1186年）。京都守護となり、承久の乱で父と違って京方についた（史実）' },
+    { id: 'hirotsuna', date: [1182, 1, 1], parents: ['sadatsuna'], p: { name: '佐々木広綱', kana: 'ささきひろつな', born: 1182, died: 1221, faction: null, status: '定綱の嫡男', abilities: { command: 60, valor: 65, politics: 50, intellect: 50, diplomacy: 45 }, personality: '剛直', ambition: 55, loyalty: 70, rel: [['sadatsuna', '父子（相手側）']] }, note: '生年は不詳（ゲームでは1182年）。在京御家人で、承久の乱で京方についた（史実）' },
     { id: 'yoriie', date: [1182, 8, 12], parents: ['yoritomo', 'masako'], p: { name: '源頼家', kana: 'みなもとのよりいえ', born: 1182, died: 1204, faction: 'yoritomo', status: '頼朝の嫡男', abilities: { command: 55, valor: 70, politics: 38, intellect: 45, diplomacy: 35 }, personality: '剛直', ambition: 70, loyalty: 90, rel: [['yoritomo', '父子（相手側）'], ['masako', '母子（相手側）']] } },
     { id: 'yasutoki', date: [1183, 1, 1], parents: ['yoshitoki'], house: 'hojo', p: { name: '北条泰時', kana: 'ほうじょうやすとき', born: 1183, died: 1242, faction: null, status: '義時の子', abilities: { command: 75, valor: 65, politics: 92, intellect: 88, diplomacy: 80 }, personality: '公正', ambition: 50, loyalty: 90, rel: [['yoshitoki', '父子（相手側）']] }, note: '誕生月日は不詳（1183年）' },
     { id: 'sanetomo', date: [1192, 8, 9], parents: ['yoritomo', 'masako'], p: { name: '源実朝', kana: 'みなもとのさねとも', born: 1192, died: 1219, faction: 'yoritomo', status: '頼朝の次男', abilities: { command: 25, valor: 20, politics: 55, intellect: 80, diplomacy: 65 }, personality: '風雅', ambition: 30, loyalty: 90, rel: [['yoritomo', '父子（相手側）'], ['masako', '母子（相手側）']] } },
@@ -1654,6 +2330,7 @@
     BIRTHS.forEach(function (b) {
       if (s.persons[b.id] || cmpDate(s.date, { y: b.date[0], m: b.date[1], leap: false, d: b.date[2] }) < 0) return;
       if (b.requires && !s.flags[b.requires]) return;
+      if (b.parents.some(function (pid) { return !s.persons[pid]; })) return; // 親がまだ登場していない（下向前など）
       if (!b.parents.every(function (pid) { return alive(s, pid); })) { s.persons[b.id] = { id: b.id, name: b.p.name, alive: false, born: null, died: null, faction: null, abilities: b.p.abilities, relations: [], status: '（生まれなかった）', note: '親が亡くなっていたため誕生しない（歴史の分岐）', notBorn: true, courtOffices: [], warriorOffices: [] }; return; }
       var par = Pn(s, b.parents[0]), fac = b.p.faction || par.faction;
       var p = s.persons[b.id] = { id: b.id, name: b.p.name, kana: b.p.kana, born: b.p.born, died: b.p.died, birthConfidence: '史実', faction: fac, location: par.location && !/^(army|envoy):/.test(String(par.location)) ? par.location : (F(s, fac) ? F(s, fac).capital : null), status: b.p.status, rank: '', courtOffices: [], warriorOffices: [], abilities: b.p.abilities, abilitiesConfidence: 'ゲーム設定', personality: b.p.personality, ambition: b.p.ambition, loyalty: b.p.loyalty, alive: true, health: 100, note: b.note || '', relations: b.p.rel.map(function (r) { return { person: r[0], type: r[1] }; }), naturalDeath: null, captiveOf: null };
@@ -1842,14 +2519,21 @@
   function retPersons(s, r) { return r.kind === 'house' ? H(s, r.id).members.map(function (m) { return Pn(s, m); }).filter(Boolean) : factionPersons(s, r.id).concat(F(s, r.id).leader && Pn(s, F(s, r.id).leader) ? [Pn(s, F(s, r.id).leader)] : []); }
   // 主君と血のつながった家（一門）は謀反を起こさない。縁戚（婚姻）は起こしにくい
   function kinship(s, lord, r) {
-    var L = F(s, lord); if (!L) return null; var lp = Pn(s, L.leader); var ids = [L.leader, L.heir].filter(Boolean);
+    var L = F(s, lord); if (!L) return null;
+    if (r.kind === 'house' && H(s, r.id) && H(s, r.id).parent) { if (rootOf(s, r.id) === lord) return 'blood'; var pr = H(s, r.id).parent; if (pr !== r.id && (H(s, pr) || F(s, pr))) { var pk = kinship(s, lord, { kind: H(s, pr) && !H(s, pr).asFaction ? 'house' : 'vassal', id: pr }); if (pk) return pk; } } /* 分家は本家の縁を引き継ぐ */ var lp = Pn(s, L.leader); var ids = [L.leader, L.heir].filter(Boolean);
     var ps = retPersons(s, r), blood = false, inlaw = false;
     ps.forEach(function (p) { (p.relations || []).forEach(function (x) { if (ids.indexOf(x.person) < 0) return; if (BLOOD.test(x.type)) blood = true; else if (/夫婦|舅|娘婿|乳母/.test(x.type)) inlaw = true; }); });
     if (lp) (lp.relations || []).forEach(function (x) { if (ps.some(function (p) { return p.id === x.person; })) { if (BLOOD.test(x.type)) blood = true; else if (/夫婦|舅|娘婿|乳母/.test(x.type)) inlaw = true; } });
+    if (!blood && !inlaw && lp) { var sp = Object.keys(s.persons).map(function (k) { return s.persons[k]; }).filter(function (q) { return (q.relations || []).some(function (x) { return x.person === lp.id && /夫婦/.test(x.type); }) || (lp.relations || []).some(function (x) { return x.person === q.id && /夫婦/.test(x.type); }); }); // 当主の妻の実家
+      sp.forEach(function (w) { ps.forEach(function (p) { if ((w.relations || []).some(function (x) { return x.person === p.id && /父|母|子|娘|兄|弟|姉|妹/.test(x.type); }) || (p.relations || []).some(function (x) { return x.person === w.id && /父|母|子|娘|兄|弟|姉|妹/.test(x.type); })) inlaw = true; }); }); }
     return blood ? 'blood' : inlaw ? 'inlaw' : null;
   }
   function serviceOf(s, lord, id) { s.service = s.service || {}; s.service[lord] = s.service[lord] || {}; return s.service[lord][id] || 0; }
-  function addService(s, lord, id, v) { s.service = s.service || {}; s.service[lord] = s.service[lord] || {}; s.service[lord][id] = Math.max(0, (s.service[lord][id] || 0) + v); }
+  function serviceTick(s) { // 毎月：忠誠の厚い家は報われない働きを気にしなくなっていく（上限12）
+    Object.keys(s.service || {}).forEach(function (lord) { var m = s.service[lord]; Object.keys(m).forEach(function (id) { var r = s.houses[id] && !s.houses[id].asFaction ? { kind: 'house', id: id } : { kind: 'vassal', id: id }; var L = F(s, lord) && (s.houses[id] || F(s, id)) ? retLoyalty(s, r, lord) : 50;
+      m[id] = Math.min(12, m[id] * (L >= 80 ? 0.7 : L >= 65 ? 0.8 : L >= 50 ? 0.9 : 0.97) - (L >= 65 ? 0.5 : 0)); if (m[id] < 0.3) delete m[id]; }); });
+  }
+  function addService(s, lord, id, v) { if (v > 0) { s.merit = s.merit || {}; s.merit[lord] = s.merit[lord] || {}; s.merit[lord][id] = (s.merit[lord][id] || 0) + v; } s.service = s.service || {}; s.service[lord] = s.service[lord] || {}; s.service[lord][id] = Math.max(0, (s.service[lord][id] || 0) + v); }
   // 攻め落とした拠点の国で、敵が持っていた所領は没官領（主君が直轄にするか、御家人に恩賞として与える）
   function conquerHoldings(s, b, old, winF) {
     if (!old || !winF) return; var lord = topLord(s, winF);
@@ -2491,15 +3175,17 @@
     if (f.id === 'court') return;
     var fam = (dead.relations || []).filter(function (r) { return /父子|兄弟/.test(r.type); }).map(function (r) { return s.persons[r.person]; })
       .filter(function (p) { return p && p.alive && p.faction === f.id && canLead(p); });
-    var pool = fam.length ? fam : factionPersons(s, f.id).filter(function (p) { return canLead(p); });
+    var br = branchHeads(s, f.id).filter(function (p) { return p && canLead(p) && (dead.relations || []).some(function (r) { return r.person === p.id && /父子|兄弟/.test(r.type); }); }); // 一門の分家の当主も継げる
+    var pool = fam.length || br.length ? fam.concat(br) : factionPersons(s, f.id).filter(function (p) { return canLead(p); });
     // 嫡流優先：あらかじめ定めた後継者
-    var heir = f.heir && canLead(Pn(s, f.heir)) && Pn(s, f.heir).faction === f.id ? Pn(s, f.heir) : null;
+    var heir = f.heir && canLead(Pn(s, f.heir)) && (Pn(s, f.heir).faction === f.id || branchHeads(s, f.id).some(function (q) { return q && q.id === f.heir; })) ? Pn(s, f.heir) : null;
     if (!heir) { pool.sort(function (a, b) { return (b.abilities.politics + b.abilities.command) - (a.abilities.politics + a.abilities.command); }); heir = pool[0]; }
     if (!heir && f.type.indexOf('寺社') >= 0) { // 寺社は組織として存続し、新たな代表を立てる
       var nid2 = dead.id + '_s' + s.day; s.persons[nid2] = JSON.parse(JSON.stringify(dead)); heir = s.persons[nid2];
       heir.id = nid2; heir.name = f.name.replace(/（.*）/, '') + 'の新たな代表'; heir.alive = true; heir.born = null; heir.died = null; heir.birthConfidence = 'ゲーム設定'; heir.location = f.capital; heir.relations = []; heir.deathDay = null; heir.note = '前代表の死後に立てられた代表（架空）';
     }
     if (!heir) { destroyFaction(s, f, '当主の死去と後継者の不在'); return; }
+    if (heir.faction !== f.id) { mergeBranch(s, heir, f.id); heir.faction = f.id; } // 分家の当主が本家を継いだ
     f.leader = heir.id; if (s.politics) recHead(s, f.id, dead.id, heir.id, dead.alive ? '当主が政から退いた' : '当主の死');
     news(s, f.name + 'の家督は' + heir.name + 'が継いだ', { type: 'politics', important: true, factions: [f.id] });
     if (heir.born && s.date.y - heir.born < 15) news(s, '幼少の当主のため、一門の後見が政務を執る', { factions: [f.id] });
@@ -2927,6 +3613,7 @@
     small: { label: '館', type: '館', money: 300, food: 400, days: 45, defense: 15, garrison: 50, note: '堀と塀をめぐらせた居館' },
     medium: { label: '城館', type: '館', money: 1200, food: 1500, days: 100, defense: 30, garrison: 150, note: '土塁・堀・櫓を備えた城館' },
     large: { label: '城郭', type: '城', money: 3000, food: 3500, days: 180, defense: 50, garrison: 300, note: '山や川を利用した大規模な城郭' },
+    temple: { label: '寺社（氏寺・氏社）', type: '寺社', money: 800, food: 500, days: 120, defense: 8, garrison: 20, permit: true, note: '朝廷の許しを得て建てた氏寺・氏社。毎月、大義が少し上がり、その国の不穏が鎮まる' },
   };
   function buildRights(s, fid, pid) {
     var mine = Object.keys(s.holdings).some(function (k) { var h = s.holdings[k]; return h.province === pid && sameCamp(s, h.controller, fid); });
@@ -2936,7 +3623,7 @@
   }
   function startConstruction(s, cmd) {
     var f = F(s, cmd.faction), spec = BUILD[cmd.scale || 'small'], pv = PV(s, cmd.province);
-    if (!spec) return { ok: false, reason: '規模は small / medium / large' };
+    if (!spec) return { ok: false, reason: '規模は small / medium / large / temple' };
     if (!pv) return { ok: false, reason: '建設する国が不明' };
     var rt = buildRights(s, cmd.faction, cmd.province);
     if (!rt.ok) return { ok: false, reason: pv.name + 'に自勢力の所領・拠点がなく、土地の権利がない（影響力 ' + Math.round(rt.share * 100) + '%、25%以上が必要）' };
@@ -2948,9 +3635,10 @@
     if (clash) return { ok: false, reason: '近くに' + clash.name + 'がある（約' + Math.round(Math.hypot(clash.x - x, clash.y - y) / s.meta.map.pxPerKm * 10) / 10 + 'km）。少し離して選ぶこと' };
     var count = Object.keys(s.constructions).filter(function (k) { return s.constructions[k].faction === cmd.faction; }).length;
     if (count >= 3) return { ok: false, reason: '同時に進められる普請は3か所まで' };
+    if (spec.permit && !(f.templePermits > 0)) return { ok: false, reason: '寺社を建てるには朝廷の許し（勅許）が要る。朝廷タブ・普請タブから願い出ること' };
     if (f.money < spec.money) return { ok: false, reason: '資金不足（必要 ' + spec.money + '貫、所持 ' + Math.floor(f.money) + '貫）' };
     if (f.food < spec.food) return { ok: false, reason: '兵糧不足（人夫の食料 ' + spec.food + '石が必要、所持 ' + Math.floor(f.food) + '石）' };
-    f.money -= spec.money; f.food -= spec.food;
+    f.money -= spec.money; f.food -= spec.food; if (spec.permit) f.templePermits -= 1;
     var id = nid(s, 'build');
     var name = (cmd.name && String(cmd.name).trim()) || (pv.name + 'の新' + spec.label);
     s.constructions[id] = { id: id, faction: cmd.faction, province: cmd.province, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, name: name, scale: cmd.scale || 'small', spec: spec, progress: 0, required: spec.days, started: s.day, threatDays: 0, paused: false };
@@ -2979,7 +3667,7 @@
       c.progress += laborRate(s, c.province);
       if (c.progress >= c.required) {
         var id = 'built_' + k;
-        s.bases[id] = { id: id, name: c.name, province: c.province, type: c.spec.type, owner: c.faction, defense: c.spec.defense, maxDefense: c.spec.defense, garrison: c.spec.garrison, x: c.x, y: c.y, confidence: 'ゲーム設定', note: c.spec.note + '（' + dateStr(s) + '完成）', built: true };
+        s.bases[id] = { id: id, name: c.name, province: c.province, type: c.spec.type, owner: c.faction, house: c.house && H(s, c.house) && H(s, c.house).faction === c.faction ? c.house : null, defense: c.spec.defense, maxDefense: c.spec.defense, garrison: c.spec.garrison, x: c.x, y: c.y, confidence: 'ゲーム設定', note: c.spec.note + '（' + dateStr(s) + '完成）', built: true };
         delete s.constructions[k];
         news(s, '【完成】' + c.name + '（' + c.spec.label + '）が完成した', { type: 'build', important: true, factions: [c.faction], province: c.province });
         if (c.faction === s.playerFaction) stop(s, { key: 'build_done', title: c.name + ' 完成', place: PV(s, c.province).name, text: c.spec.label + 'が完成した。防御 ' + c.spec.defense + '、守備兵 ' + c.spec.garrison + '。本拠に定めることもできる。', choices: [] });
@@ -2994,7 +3682,12 @@
       if (a.commander && !alive(s, a.commander)) { a.commander = a.officers.filter(function (o) { return alive(s, o); })[0] || null; if (a.officers.indexOf(a.commander) >= 0) a.officers.splice(a.officers.indexOf(a.commander), 1); }
       if (a.commander && Pn(s, a.commander).captiveOf) a.commander = null;
     });
-    Object.keys(s.corps || {}).forEach(function (cid) { if (!Object.keys(s.armies).some(function (k) { return s.armies[k].corps === cid; })) delete s.corps[cid]; });
+    Object.keys(s.corps || {}).forEach(function (cid) { var cp = s.corps[cid], arms = Object.keys(s.armies).map(function (k) { return s.armies[k]; }).filter(function (a) { return a.corps === cid || a.joinCorps === cid; });
+      if (!arms.some(function (a) { return a.corps === cid; })) { arms.forEach(function (a) { a.joinCorps = null; }); delete s.corps[cid]; return; }
+      if (cp.faction && !arms.some(function (a) { return a.faction === cp.faction && !a.house; })) { // 主君の軍がいなくなった軍団は解く（参陣の家の軍は陣を払って帰る）
+        arms.forEach(function (a) { a.corps = null; a.joinCorps = null; if (!a.battleId) { a.mission = 'idle'; if (a.faction !== s.playerFaction || a.house) disbandArmy(s, a, 'release'); } });
+        news(s, (pname(s, cp.commander) || '') + 'の軍団は解かれ、参陣の家々は陣を払って本領へ帰った', { type: 'military', factions: [cp.faction] }); delete s.corps[cid]; } });
+    Object.keys(s.persons).forEach(function (k) { var p = s.persons[k]; var m = /^army:(.+)$/.exec(String(p.location || '')); if (m && !s.armies[m[1]]) { var f0 = F(s, p.faction); p.location = f0 && f0.capital ? f0.capital : null; } }); // 消えた軍にいたままの人を戻す
     Object.keys(s.factions).forEach(function (k) {
       var f = s.factions[k]; if (!f.alive || k === 'court') return;
       if (k === s.playerFaction && factionBases(s, k).length) s.flags.playerHadBase = true;
@@ -3306,6 +3999,7 @@
     s.firedEvents['tsuito_' + target] = s.day;
     news(s, '【追討宣旨】朝廷は' + t.name + 'の追討を命じた（' + fname(s, requester) + 'の申請）。諸国の武士に参陣が求められる', { type: 'court', important: true, factions: [target, requester] });
     broadcast(s, 'tsuito_' + target, B(s, s.court.location).province, '朝廷が' + t.name + '追討の宣旨を下した');
+    kyogataRally(s, target, requester);
     stop(s, { key: 'tsuito_senji', title: '追討宣旨', place: B(s, s.court.location).name, persons: [], text: '朝廷は' + t.name + 'を追討する宣旨を下した。宣旨は正当性を与えるが、すべての武士が従うわけではない。各勢力は利害に応じて参加・静観を判断する。', choices: [] });
   }
 
@@ -3318,7 +4012,7 @@
     ids.forEach(function (fid, idx) {
       var f = s.factions[fid]; if (!f.alive || fid === s.playerFaction || fid === 'court') return;
       if (urgent[fid] && B(s, urgent[fid])) council(s, fid, 'defend', { H: B(s, urgent[fid]).name }, '緊急の評定', B(s, urgent[fid]).name + 'が攻められた');
-      if ((s.day + idx) % s.options.aiInterval !== 0 && !urgent[fid]) return;
+      if ((s.day + idx) % (s.options.aiInterval * (f.clan ? 3 : 1)) !== 0 && !urgent[fid]) return; // 小さな在地の家は評定の間隔を長く
       try { aiFaction(s, f); } catch (e) { aiLog(s, fid, 'エラー', String(e && e.message)); }
     });
     // プレイヤー勢力の家臣（主従関係にある勢力）は AI が動かす（上で処理済み）。プレイヤー軍の兵糧切れ警告
@@ -3714,17 +4408,20 @@
       var momentum = Object.keys(s.factions).filter(function (k) { return s.factions[k].alive && s.factions[k].overlord === rid; }).length * 4;
       if (held) { var lordNear = lord === 'heike' ? heikePow : campPower(s, lord) * (far ? 0.3 : 1), overwhelmed = d < 130 && rebelPow > 2.5 * Math.max(100, lordNear);
         if (!overwhelmed) { if (s.day % 30 === 0) aiLog(s, f.id, '主君に従う', fname(s, lord) + 'との主従（関係' + Math.round(rel(s, f.id, lord).value) + '）を重んじ、' + R.name + 'には付かない'); return; } }
+      var yRid = rid === 'yoritomo' || rid === s.playerFaction; // なびきやすさは頼朝方（プレイヤー）への傾き
+      if (!yRid && f.clan && rid !== f.prefer && ((F(s, 'yoritomo') && F(s, 'yoritomo').alive) || (nabikiOf(s, f.id) >= 70 && d >= 60))) return; // 東国の諸家は頼朝が健在なうちはほかの源氏に付かない（頼朝を待つ）
       var presence = d < 60 ? 18 : d < 130 ? 8 : 0; // 反乱の主将が自ら近くに来ている
       if (lord && F(s, lord) && (F(s, lord).institutions || {}).samurai_dokoro) presence -= 15; // 侍所による御家人統制
       var grievance = rel(s, f.id, 'heike').value < -20 && !lord ? 12 : 0;
-      var score = presence + grievance + momentum + r * 0.6 + (R.legitimacy - 40) * 0.3 + clamp((rebelPow - heikePow) / Math.max(200, heikePow) * 25, -12, 20) + (f.policy.indexOf('源氏寄り') >= 0 ? 20 : 0)
+      var score = presence + grievance + momentum + r * 0.6 + (R.legitimacy - 40) * 0.3 + clamp((rebelPow - heikePow) / Math.max(200, heikePow) * 25, -12, 20) + (f.policy.indexOf('源氏寄り') >= 0 ? (yRid ? 20 : 8) : 0) + (yRid ? (nabikiOf(s, f.id) - 50) * 0.3 : f.clan ? (rid === f.prefer ? 25 : -12) : 0)
         - bond - (f.switches || 0) * 8 - (R.flags.choteki ? 5 : 0) - (lord === 'heike' ? rel(s, f.id, 'heike').value * 0.3 : 0) + (rel(s, f.id, 'heike').value < -20 ? 10 : 0) + rr(s, -10, 10);
       f.ai.memo = rid + ':' + Math.round(score);
+      if (score > 28 && rid === s.playerFaction) { if (!offerPending(s, f.id) && (f.lastOffer == null || s.day - f.lastOffer >= 90)) offerSubmission(s, f.id, rid, '評定の結果、' + R.name + 'に付くと決めた'); return; }
       if (score > 28) {
         changeAllegiance(s, f.id, rid, '評価値' + Math.round(score) + '（関係' + Math.round(r) + '、反乱側兵力' + Math.round(rebelPow) + '対 平家方' + Math.round(heikePow) + '）');
         // 合流：兵を挙げて主君のもとへ
         var av = availableBandTroops(s, f.id, cap.province);
-        if (av > 80) { var m = mobilize(s, f.id, cap.province, av, null, { base: cap.id, foodDays: 30 }); if (m.army && main) { setArmyTarget(s, m.army, { type: 'province', id: main.province }, 'move'); aiLog(s, f.id, m.army.troops + 'を率いて' + R.name + 'に合流', '参陣'); } }
+        if (av > 80 && !f.clan) { var m = mobilize(s, f.id, cap.province, av, null, { base: cap.id, foodDays: 30 }); /* 東国の小さな家は本領に留まり、催促があれば参陣する */ if (m.army && main) { setArmyTarget(s, m.army, { type: 'province', id: main.province }, 'move'); aiLog(s, f.id, m.army.troops + 'を率いて' + R.name + 'に合流', '参陣'); } }
       } else if (!lord && score < -15 && rel(s, f.id, 'heike').value > 0) {
         changeAllegiance(s, f.id, 'heike', '反乱に与せず平家方に付く（評価値' + Math.round(score) + '）');
       } else if (s.day % 20 === 0) aiLog(s, f.id, '静観', R.name + 'への評価値' + Math.round(score));
@@ -4072,11 +4769,16 @@
     if (ev.choices && ev.choices.length && !ev.choices.some(function (c) { return c.id === choiceId; })) return { ok: false, reason: '選択肢が不正: ' + choiceId };
     ev.resolved = true; ev.choice = choiceId;
     var msg = '';
+    if (ev.key === 'captives') return { ok: true, message: resolveCaptives(s, ev.group, choiceId) };
+    if (ev.key === 'office_request') return { ok: true, message: resolveOfficeRequest(s, ev, choiceId) };
+    if (ev.key === 'base_attacked') return { ok: true, message: choiceId === 'relief' ? '援軍の編成を開く' : '守備兵に任せる', relief: choiceId === 'relief' ? { type: 'base', id: ev.base } : null };
+    if (ev.key === 'submission') return { ok: true, message: resolveSubmission(s, ev, choiceId) };
     if (ev.key === 'kokushi_offer') { var kp = Pn(s, ev.person); if (choiceId === 'decline' || !kp || !kp.alive) return { ok: true, message: '国司の任命を辞退した' }; var tt = applyOffice(s, kp, 'kami', ev.province, choiceId, s.playerFaction, '朝廷の任命'); return { ok: true, message: kp.name + 'は' + tt + '（' + choiceId + '）となった' }; }
     if (ev.key === 'mudan') return { ok: true, message: resolveMudan(s, ev, choiceId) };
     if (ev.key === 'rewards') { var done0 = [], fid0 = s.playerFaction;
-      (ev.helpers || []).forEach(function (h) { if (choiceId === 'later') return; var r1 = bestow(s, fid0, { kind: 'kanjo', target: h }); if (r1.ok) done0.push(h); if (choiceId === 'kanjo') bestow(s, fid0, { kind: 'gift', target: h }); });
-      return { ok: true, message: choiceId === 'later' ? '恩賞は追って考える' : done0.length + '家に感状' + (choiceId === 'kanjo' ? 'と引出物' : '') + 'を与えた' }; }
+      if (choiceId === 'done') { var nGiven = Object.keys(ev.given || {}).length; return { ok: true, message: '論功行賞を終えた（' + nGiven + '家・人に恩賞）' }; }
+      (ev.helpers || []).forEach(function (h) { if (choiceId === 'later') return; if ((ev.given || {})[h] && ev.given[h].some(function (g) { return /感状/.test(g); })) return; var r1 = bestow(s, fid0, { kind: 'kanjo', target: h }); if (r1.ok) done0.push(h); if (choiceId === 'kanjo') bestow(s, fid0, { kind: 'gift', target: h }); });
+      return { ok: true, message: choiceId === 'later' ? '恩賞は追って考える（恩賞タブ）' : done0.length + '家に感状' + (choiceId === 'kanjo' ? 'と引出物' : '') + 'を与えた' }; }
     if (ev.key === 'attack_failed') { var arms0 = (ev.armies || []).map(function (id) { return s.armies[id]; }).filter(function (a) { return a && a.status !== 'battle'; });
       if (choiceId === 'return') { arms0.forEach(function (a) { disbandArmy(s, a, 'garrison'); }); return { ok: true, message: '兵を館に戻した（' + arms0.length + '隊）' }; }
       if (choiceId === 'retry') { arms0.forEach(function (a) { a.regroup = ev.base; a.holdUntil = s.day + 90; }); return { ok: true, message: arms0.length + '隊は兵を立て直し、士気が戻りしだい' + B(s, ev.base).name + 'を再び攻める' }; }
@@ -4200,14 +4902,25 @@
       case 'vassal_command': return vassalCommand(s, cmd.faction, cmd);
       case 'withdraw': return withdrawArmy(s, cmd.faction, cmd.army);
       case 'bestow': return bestow(s, cmd.faction, cmd);
+      case 'reward': return giveReward(s, cmd.faction, cmd);
+      case 'intercept': return intercept(s, cmd.faction, cmd);
+      case 'station': return stationArmy(s, cmd.faction, cmd);
+      case 'return_home': return returnHome(s, cmd.faction, cmd);
+      case 'temple_permit': return templePermit(s, cmd.faction);
+      case 'kaikon': return kaikon(s, cmd.faction, cmd);
+      case 'delegate': return setDelegate(s, cmd.faction, cmd);
+      case 'repair': return repairBase(s, cmd.faction, cmd);
       case 'grant_base': return grantBase(s, cmd.faction, cmd);
+      case 'yashiki': return giveYashiki(s, cmd.faction, cmd);
+      case 'jokyo': return jokyo(s, cmd.faction, cmd);
       case 'rename_base': return renameBase(s, cmd.faction, cmd);
       case 'nominate': return nominate(s, cmd.faction, cmd);
       case 'resign_office': return resignOffice(s, cmd.faction, cmd);
       case 'appoint_office': return shikkenAppoint(s, cmd.faction, cmd);
       case 'build_facility': return buildFacility(s, cmd.faction, cmd);
       case 'split_corps': return splitCorps(s, cmd.faction, cmd);
-      case 'set_heir': { var hp = Pn(s, cmd.person); if (!hp || !hp.alive || hp.faction !== cmd.faction || hp.id === f.leader) return { ok: false, reason: '自家の存命の一門を指定すること' }; f.heir = hp.id; ensureRegime(s); f.regime.heirStab = Math.max(0, f.regime.heirStab - 5); news(s, f.name + 'は' + hp.name + 'を後継者に定めた', { type: 'politics', factions: [cmd.faction] }); return { ok: true, message: hp.name + 'を後継者に定めた' }; }
+      case 'set_heir': { var hp = Pn(s, cmd.person); if (hp && hp.alive && hp.faction !== cmd.faction && branchHeads(s, cmd.faction).some(function (q) { return q && q.id === hp.id; })) { f.heir = hp.id; news(s, f.name + 'は一門の分家の' + hp.name + 'を後継者に定めた', { type: 'politics', factions: [f.id] }); return { ok: true, message: hp.name + '（分家の当主）を後継者に定めた。継げば分家は本家に戻る' }; }
+        if (!hp || !hp.alive || hp.faction !== cmd.faction || hp.id === f.leader) return { ok: false, reason: '自家の存命の一門を指定すること' }; f.heir = hp.id; ensureRegime(s); f.regime.heirStab = Math.max(0, f.regime.heirStab - 5); news(s, f.name + 'は' + hp.name + 'を後継者に定めた', { type: 'politics', factions: [cmd.faction] }); return { ok: true, message: hp.name + 'を後継者に定めた' }; }
       case 'donate': {
         var b = B(s, cmd.base); if (!b || b.type !== '寺社') return { ok: false, reason: '寄進先の寺社を指定してください' };
         var amt = Math.max(0, cmd.amount || 0); if (f.money < amt) return { ok: false, reason: '資金不足（所持' + Math.floor(f.money) + '貫）' };
@@ -4286,7 +4999,7 @@
       case 'court_gift': return '朝廷の派閥へ献金' + c.amount + '貫';
       case 'jito': return (s.holdings[c.holding] ? s.holdings[c.holding].name : '') + 'に地頭を置く';
       case 'regime': return (REGIME_ACTS[c.action] || {}).label || '体制の施策';
-      case 'bakufu': return '幕府政治'; case 'reform': return (REFORMS[c.kind] || {}).label || '制度改革'; case 'grant_base': return (B(s, c.base) ? B(s, c.base).name : '館') + 'を与える'; case 'rename_base': return '館の名を改める'; case 'nominate': return '任官の推挙：' + (Pn(s, c.person) ? Pn(s, c.person).name : '') + ((KAN[c.office] || {}).name ? '（' + KAN[c.office].name + '）' : ''); case 'resign_office': return '官を辞させる'; case 'bestow': return '御恩：' + ((BESTOW[c.kind] || {}).label || ''); case 'withdraw': return (s.armies[c.army] ? armyLabel(s, s.armies[c.army]) : '軍勢') + 'の退却'; case 'vassal_command': return '御家人への命：' + ({ muster: '兵を増やせ', recall: '帰陣', attack: '出陣', defend: '守り', join: '軍団に加われ' }[c.act] || ''); case 'vassal_order': return '指図：' + ({ attack: '出陣の要請', defend: '守りの要請', join: '軍団への合流' }[c.act] || ''); case 'politics': return { consult: '合議', guard: '警固', spy: '諜報', divide: '切り崩し', strike: '反対派の弾圧', compromise: '妥協', retire: '隠居' }[c.act] || '政治'; case 'appoint_office': return '幕府の人事';
+      case 'bakufu': return '幕府政治'; case 'reform': return (REFORMS[c.kind] || {}).label || '制度改革'; case 'yashiki': return '屋敷を構える'; case 'jokyo': return '上洛'; case 'grant_base': return (B(s, c.base) ? B(s, c.base).name : '館') + 'を与える'; case 'rename_base': return '館の名を改める'; case 'nominate': return '任官の推挙：' + (Pn(s, c.person) ? Pn(s, c.person).name : '') + ((KAN[c.office] || {}).name ? '（' + KAN[c.office].name + '）' : ''); case 'resign_office': return '官を辞させる'; case 'bestow': return '御恩：' + ((BESTOW[c.kind] || {}).label || ''); case 'reward': return '恩賞：' + (REWARD_KINDS[c.kind] || ''); case 'intercept': return '敵軍の迎撃'; case 'return_home': return c.release ? '陣を払わせる' : '館に帰らせる'; case 'station': return c.merge ? '守備兵に加える' : '見張りに置く'; case 'temple_permit': return '寺社建立の勅許を願う'; case 'kaikon': return '開墾'; case 'delegate': return '委任の設定'; case 'repair': return '修復'; case 'withdraw': return (s.armies[c.army] ? armyLabel(s, s.armies[c.army]) : '軍勢') + 'の退却'; case 'vassal_command': return '御家人への命：' + ({ muster: '兵を増やせ', recall: '帰陣', attack: '出陣', defend: '守り', join: '軍団に加われ' }[c.act] || ''); case 'vassal_order': return '指図：' + ({ attack: '出陣の要請', defend: '守りの要請', join: '軍団への合流' }[c.act] || ''); case 'politics': return { consult: '合議', guard: '警固', spy: '諜報', divide: '切り崩し', strike: '反対派の弾圧', compromise: '妥協', retire: '隠居' }[c.act] || '政治'; case 'appoint_office': return '幕府の人事';
       case 'spoil': return '没官領の処分'; case 'ando': return '本領安堵'; case 'grant': return '新恩給与'; case 'confiscate': return '所領の没収';
       case 'build_facility': return (FACILITIES[c.kind] || {}).label + 'の普請'; case 'split_corps': return '軍団の分割';
       case 'set_heir': return pname(s, c.person) + 'を後継者に';
@@ -4373,7 +5086,7 @@
     if (!s || !s.engineVersion || !s.factions || !s.date) throw new Error('セーブデータの形式が不正');
     if (s.engineVersion.split('.')[0] !== ENGINE_VERSION.split('.')[0]) throw new Error('エンジンのメジャーバージョンが異なる');
     s.corps = s.corps || {}; s.recruits = s.recruits || []; s.constructions = s.constructions || {};
-    ensureCourt(s); ensureHoldings(s); ensureRegime(s); migrateHouses(s); migrateHouses3(s); migrateHouses4(s); ensurePlayer(s); ensurePolitics(s); ensureNinkan(s); s.options.goal = s.options.goal || 'unify'; s.objectives = s.objectives || {};
+    ensureCourt(s); ensureHoldings(s); ensureRegime(s); migrateHouses(s); migrateHouses3(s); migrateHouses4(s); migrateHouses5(s); migrateClans(s); ensureYashiki(s); ensurePlayer(s); ensurePolitics(s); ensureNinkan(s); s.options.goal = s.options.goal || 'unify'; s.objectives = s.objectives || {};
     return s;
   }
   function summary(s) {
@@ -4410,7 +5123,12 @@
     version: ENGINE_VERSION,
     createGame: createGame, advanceDay: advanceDay, runDays: runDays, runUntilMonthEnd: runUntilMonthEnd,
     issueCommand: issueCommand, BUILD: BUILD, buildRights: buildRights, INSTITUTIONS: INSTITUTIONS, bakufuCheck: bakufuCheck,
-    unifyStatus: unifyStatus, killPerson: killPerson, shogunState: shogunState, clanStatus: clanStatus, arrivalsTick: arrivalsTick, ARRIVALS: ARRIVALS, politicalStatus: politicalStatus, orderRetainer: orderRetainer, vassalCommand: vassalCommand, callPreview: callPreview, ENGINE_VERSION: ENGINE_VERSION, grantBase: grantBase, renameBase: renameBase, KAN: KAN, ninkanEra: ninkanEra, nominate: nominate, candidatesFor: candidatesFor, kakushiki: kakushiki, jinji: jinji, ninkanMonthly: ninkanMonthly, ninkanTick: ninkanTick, applyOffice: applyOffice, houseOfPerson: houseOfPerson, houseRecruitRoom: houseRecruitRoom, addService: addService, BESTOW: BESTOW, bestow: bestow, cabalView: cabalView, grudge: grudge, addGrudge: addGrudge, successorCandidates: successorCandidates, candidateInfo: candidateInfo, openSelection: openSelection, applySuccessor: applySuccessor, politicsMonthly: politicsMonthly, cabalTick: cabalTick, tryAssassinate: tryAssassinate, fallPerson: fallPerson, politicsAct: politicsAct, canLead: canLead, ensurePolitics: ensurePolitics, supportFrom: supportFrom, shogunTick: shogunTick, clanTick: clanTick, houseDrift: houseDrift, bakufuChart: bakufuChart, pendingSpoils: pendingSpoils, kinship: kinship, serviceOf: serviceOf, loyaltyTick: loyaltyTick, transferPlayer: transferPlayer, participants: participants, shikkenStatus: shikkenStatus, REFORMS: REFORMS, tie: tie, pName: pName, shogunTie: shogunTie, reformSupport: reformSupport, birthsTick: birthsTick, shogunateTick: shogunateTick, retainersOf: retainersOf, retLoyalty: retLoyalty, landCategory: landCategory, houseTroops: houseTroops, houseHoldings: houseHoldings, houseBands: houseBands, FACILITIES: FACILITIES, ROUTES: ROUTES, houseToFaction: houseToFaction, joinDecision: joinDecision, regimeOf: regimeOf, regimeHouses: regimeHouses, REGIME_ACTS: REGIME_ACTS, heirScore: heirScore, distributeIncome: distributeIncome, jitoAllowed: jitoAllowed, SHARES: SHARES, supplyAt: supplyAt, foodPrice: foodPrice, baseFoodCap: baseFoodCap, DIFFICULTY: DIFFICULTY, GOALS: GOALS, objectiveStatus: objectiveStatus, courtSupport: courtSupport, cliqueAtt: cliqueAtt, insenAvailable: insenAvailable, risesBy: risesBy,
+    createArmy: createArmy, changeAllegiance: changeAllegiance, issueTsuito: issueTsuito, resolveSubmission: resolveSubmission,
+    returnHome: returnHome, rootOf: rootOf, branchHeads: branchHeads, houseBuildTick: houseBuildTick, mergeBranch: mergeBranch,
+    templePermit: templePermit, kaikon: kaikon, setDelegate: setDelegate, DELEGATE: DELEGATE, delegateTick: delegateTick, officeTick: officeTick, mergeTick: mergeTick, groupLabel: groupLabel, fireCheck: fireCheck, fireTick: fireTick, repairBase: repairBase, kaikonTick: kaikonTick, templeTick: templeTick,
+    volunteerTick: volunteerTick, stationArmy: stationArmy, siegeMinDays: siegeMinDays, setArmyTarget: setArmyTarget, battleMerit: battleMerit, giveReward: giveReward, intercept: intercept, chaseTick: chaseTick, REWARD_KINDS: REWARD_KINDS,
+    CLANS: CLANS, migrateClans: migrateClans, nabikiTick: nabikiTick, offerSubmission: offerSubmission, kyogataRally: kyogataRally, kyogataOf: kyogataOf, gokeninRanking: gokeninRanking, jokyuTick: jokyuTick, meritOf: meritOf,
+    unifyStatus: unifyStatus, killPerson: killPerson, shogunState: shogunState, clanStatus: clanStatus, arrivalsTick: arrivalsTick, ARRIVALS: ARRIVALS, politicalStatus: politicalStatus, orderRetainer: orderRetainer, vassalCommand: vassalCommand, giveYashiki: giveYashiki, yashikiName: yashikiName, jokyo: jokyo, resolveCaptives: resolveCaptives, serviceTick: serviceTick, lastBaseFall: lastBaseFall, callPreview: callPreview, ENGINE_VERSION: ENGINE_VERSION, grantBase: grantBase, renameBase: renameBase, KAN: KAN, ninkanEra: ninkanEra, nominate: nominate, candidatesFor: candidatesFor, kakushiki: kakushiki, jinji: jinji, ninkanMonthly: ninkanMonthly, ninkanTick: ninkanTick, applyOffice: applyOffice, houseOfPerson: houseOfPerson, houseRecruitRoom: houseRecruitRoom, addService: addService, BESTOW: BESTOW, bestow: bestow, cabalView: cabalView, grudge: grudge, addGrudge: addGrudge, successorCandidates: successorCandidates, candidateInfo: candidateInfo, openSelection: openSelection, applySuccessor: applySuccessor, politicsMonthly: politicsMonthly, cabalTick: cabalTick, tryAssassinate: tryAssassinate, fallPerson: fallPerson, politicsAct: politicsAct, canLead: canLead, ensurePolitics: ensurePolitics, supportFrom: supportFrom, shogunTick: shogunTick, clanTick: clanTick, houseDrift: houseDrift, bakufuChart: bakufuChart, pendingSpoils: pendingSpoils, kinship: kinship, serviceOf: serviceOf, loyaltyTick: loyaltyTick, transferPlayer: transferPlayer, participants: participants, shikkenStatus: shikkenStatus, REFORMS: REFORMS, tie: tie, pName: pName, shogunTie: shogunTie, reformSupport: reformSupport, birthsTick: birthsTick, shogunateTick: shogunateTick, retainersOf: retainersOf, retLoyalty: retLoyalty, landCategory: landCategory, houseTroops: houseTroops, houseHoldings: houseHoldings, houseBands: houseBands, FACILITIES: FACILITIES, ROUTES: ROUTES, houseToFaction: houseToFaction, joinDecision: joinDecision, regimeOf: regimeOf, regimeHouses: regimeHouses, REGIME_ACTS: REGIME_ACTS, heirScore: heirScore, distributeIncome: distributeIncome, jitoAllowed: jitoAllowed, SHARES: SHARES, supplyAt: supplyAt, foodPrice: foodPrice, baseFoodCap: baseFoodCap, DIFFICULTY: DIFFICULTY, GOALS: GOALS, objectiveStatus: objectiveStatus, courtSupport: courtSupport, cliqueAtt: cliqueAtt, insenAvailable: insenAvailable, risesBy: risesBy,
     estimateOdds: estimateOdds, armyQuality: armyQuality, personFree: personFree, personNear: personNear,
     recruitInfo: recruitInfo, histEventStatus: histEventStatus, sortieSources: sortieSources, oddsFor: oddsFor, parseCommand: parseCommand, resolveEvent: resolveEvent,
     save: save, load: load, validate: validate, summary: summary,

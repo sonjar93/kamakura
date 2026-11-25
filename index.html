@@ -154,7 +154,7 @@ select,input,textarea{font:inherit;border:1px solid var(--line);border-radius:6p
 <body>
 <div id="app">
   <div id="top">
-    <span class="title">天下布武以前 ― 平安・鎌倉動乱記 <span id="verTag" style="font-size:11px;opacity:.7;font-weight:400">v2.8</span></span>
+    <span class="title">天下布武以前 ― 平安・鎌倉動乱記 <span id="verTag" style="font-size:11px;opacity:.7;font-weight:400">v2.9</span></span>
     <span id="date">—</span>
     <div class="seg" id="speed"><button data-s="0" class="on">⏸ 停止</button><button data-s="1">▶ 通常</button><button data-s="2">▶▶ 高速</button><button data-s="3">▶▶▶ 超高速</button></div>
     <button class="tbtn" id="step1">＋1日</button><button class="tbtn" id="stepM">月送り</button>
@@ -682,9 +682,12 @@ function targetFromEvent(e){
   var bg=e.target.closest&&e.target.closest('[data-base]'); if(bg) return {type:'base',id:bg.getAttribute('data-base')};
   var p=svgPt(e), pid=provAt(p.x,p.y); return pid?{type:'province',id:pid,x:p.x,y:p.y}:null;
 }
+var _downArmy=null; svg.addEventListener('pointerdown',function(e){ var g0=e.target.closest&&e.target.closest('[data-army]'); _downArmy=g0?{id:g0.getAttribute('data-army'),t:Date.now()}:null; },true); // 押した瞬間の軍を覚える（描き直しで押した先が消えても軍を選べるように）
 svg.addEventListener('click',function(e){
   if(!S||(drag&&drag.moved)) return;
   var ag=e.target.closest&&e.target.closest('[data-army]');
+  if(!ag&&_downArmy&&Date.now()-_downArmy.t<800&&S.armies[_downArmy.id]){ ag=document.querySelector('[data-army="'+_downArmy.id+'"]')||{getAttribute:function(){return _downArmy.id;}}; }
+  _downArmy=null;
   var p=svgPt(e);
   if(command&&command.kind==='build'){ var pid=provAt(p.x,p.y); if(!pid){ toast('✗ そこは国内の陸地ではない',false); return; } var c=command; cancelCommand(); run({type:'build',province:pid,scale:c.scale,name:c.name,x:p.x,y:p.y}); return; }
   if(command&&command.kind==='move'&&!ag){ var t=targetFromEvent(e); if(t) confirmMove(command.army,t,e); return; }
@@ -772,7 +775,10 @@ function armyPop(aid,e){
   if(a.faction===S.playerFaction&&!a.battleId){ var gb=Object.keys(S.bases).map(function(k){return S.bases[k];}).filter(function(b){return b.owner&&U.topLord(S,b.owner)===U.topLord(S,S.playerFaction);}).sort(function(x,y){return U.distProv(S,a.province,x.province)-U.distProv(S,a.province,y.province);}).slice(0,25);
     h+='<div style="margin-top:6px;border-top:1px solid #e6dcc4;padding-top:6px"><b>🛡 見張り・守り</b>'+(a.mission==='guard'&&a.guardBase&&S.bases[a.guardBase]?' <span class="chip">'+esc(S.bases[a.guardBase].name)+'の見張り</span>':'')+'<div class="small muted">見張りに置いた軍は館に戻らずに留まり、その拠点が攻められると守りに加わる。守備兵に加えると軍はなくなり、拠点の守備兵になる（同じ国の拠点だけ）。</div>'+
       '<div class="row" style="gap:4px"><select id="gBase" style="max-width:220px">'+gb.map(function(b){return opt(b.id,b.name+'（'+S.provinces[b.province].name+'・守備'+fmt(b.garrison)+'）',b.id===a.guardBase);}).join('')+'</select><button class="btn sm" id="gSet">見張りに置く</button><button class="btn sm sub" id="gMerge">守備兵に加える</button></div></div>'; }
+  if(a.faction===S.playerFaction&&!a.battleId) h+='<div class="acts" style="margin-top:6px"><button class="btn sm" id="pRe">行き先を選び直す</button><button class="btn sm sub" id="pHome">館に帰らせる</button></div>';
   showPop(h,e);
+  if($('pRe')) $('pRe').onclick=function(){ hidePop(); beginMove(aid); toast('行き先を地図でクリック（敵の拠点・敵軍のいる国なら攻撃）',true); };
+  if($('pHome')) $('pHome').onclick=function(){ hidePop(); cancelCommand(); run({type:'return_home',army:aid}); };
   if($('gSet')) $('gSet').onclick=function(){ hidePop(); cancelCommand(); run({type:'station',army:aid,base:$('gBase').value}); };
   if($('gMerge')) $('gMerge').onclick=function(){ hidePop(); cancelCommand(); run({type:'station',army:aid,base:$('gBase').value,merge:true}); };
   command.whole=!!cp;
@@ -818,7 +824,8 @@ function provPop(pid,e){
 }
 function infoPop(type,id,e){ var a=S.armies[id], fid=S.playerFaction;
   var h='<h4>'+esc(U.armyLabel(S,a))+'</h4><div class="small">'+fsw(a.faction)+esc(fnm(a.faction))+'<br>総大将 '+esc(pnm(a.commander))+'　'+statusJa(a.status)+(a.target?'　→'+esc(a.target.type==='base'?S.bases[a.target.id].name:S.provinces[a.target.id].name):'')+'</div>';
-  var enemy=fid&&U.atWar(S,fid,a.faction);
+  var enemy=fid&&U.atWar(S,fid,a.faction), myRet=fid&&a.faction!==fid&&U.topLord(S,a.faction)===fid;
+  if(myRet) h+='<div class="small muted" style="margin-top:4px">'+(a.corps&&S.corps[a.corps]&&S.corps[a.corps].faction===fid?'あなたの軍団に参陣している御家人の軍':'御家人の軍')+(a.lordOrder&&a.lordOrder.lord===fid?'（指図で動いている）':'')+'</div><div class="acts"><button class="btn sm sub" id="iRel">陣を払って帰らせる</button></div>';
   if(enemy){
     var mine=Object.keys(S.armies).map(function(k){return S.armies[k];}).filter(function(x){return x.faction===fid&&!x.battleId&&x.status!=='retreating';}).sort(function(x,y){return U.distProv(S,x.province,a.province)-U.distProv(S,y.province,a.province);});
     var rets=E.retainersOf(S,fid).map(function(r){ var home=r.kind==='house'?((E.houseBands(S,r.id)[0]||{}).province):((S.bases[S.factions[r.id].capital]||{}).province); return {r:r,home:home,d:home?U.distProv(S,home,a.province):9999,L:Math.round(E.retLoyalty(S,r,fid)),n:r.kind==='house'?E.houseTroops(S,r.id):(function(){var q=U.factionPower(S,r.id);return q.available+q.field;})()}; }).filter(function(x){return x.home&&x.n>=30;}).sort(function(x,y){return x.d-y.d;});
@@ -830,6 +837,7 @@ function infoPop(type,id,e){ var a=S.armies[id], fid=S.playerFaction;
       '</div><div class="acts"><button class="btn red sm" id="iGo">差し向ける</button><button class="btn sm" id="iNew">新たに出陣して迎え撃つ</button></div></div>';
   }
   showPop(h,e);
+  if($('iRel')) $('iRel').onclick=function(){ hidePop(); run({type:'return_home',army:id,release:true}); };
   if(enemy){
     [].forEach.call(document.querySelectorAll('[data-ipre]'),function(b){ b.onclick=function(){ var m=b.getAttribute('data-ipre');
       [].forEach.call(document.querySelectorAll('[data-iown]'),function(c,i){ c.checked=(m==='own'||m==='all')&&i<3; });
@@ -1327,11 +1335,15 @@ TABS.armies=function(f,fid){
   if(!f) return '<div class="card muted">観戦モード</div>';
   var my=Object.keys(S.armies).filter(function(k){return S.armies[k].faction===fid;});
   var h='<div class="card"><div class="row"><button class="btn red" data-act2="muster">⚔ 出陣の編成</button><button class="btn" data-act2="recruit">👥 徴兵</button>'+(['雌伏','密謀'].indexOf(f.status)>=0&&['yoritomo','kiso','kai'].indexOf(fid)>=0?'<button class="btn red" data-act2="uprise">挙兵する</button>':'')+'</div><div class="small muted">地図の自軍をクリックして選び、行き先をクリックすると進軍します（勝算が表示されます）。</div></div>';
+  var vs=Object.keys(S.armies).map(function(k){return S.armies[k];}).filter(function(a){return a.faction!==fid&&U.topLord(S,a.faction)===fid;});
+  var cps=Object.keys(S.corps||{}).map(function(k){return S.corps[k];}).filter(function(c){return c.faction===fid;});
+  if(cps.length) h+='<div class="card"><h3>出陣中の軍団</h3>'+cps.map(function(c){ var arms=Object.keys(S.armies).map(function(k){return S.armies[k];}).filter(function(a){return a.corps===c.id||a.joinCorps===c.id;}); var tgt=c.target?(c.target.type==='base'&&S.bases[c.target.id]?S.bases[c.target.id].name:c.target.type==='province'?S.provinces[c.target.id].name:''):''; return '<div class="row small" style="border-top:1px solid #eee5d0;padding-top:4px"><b>'+esc(pnm(c.commander))+'の軍団</b>　'+arms.length+'隊・'+fmt(arms.reduce(function(t,a){return t+a.troops;},0))+(tgt?'　→ '+esc(tgt):'')+'</div>'; }).join('')+'</div>';
+  if(vs.length) h+='<div class="card"><h3>御家人の軍（'+vs.length+'）</h3>'+vs.map(function(a){ return '<div class="row small" style="border-top:1px solid #eee5d0;padding-top:4px"><span style="flex:1">'+fsw(a.faction)+esc(U.armyLabel(S,a))+'　'+statusJa(a.status)+'・'+esc(S.provinces[a.province].name)+(a.target?' → '+esc(a.target.type==='base'&&S.bases[a.target.id]?S.bases[a.target.id].name:S.provinces[a.target.id]?S.provinces[a.target.id].name:''):'')+'</span><button class="btn sub sm" data-look="'+a.id+'">地図で見る</button>'+(a.battleId?'':'<button class="btn sub sm" data-rel="'+a.id+'">帰らせる</button>')+'</div>'; }).join('')+'</div>';
   h+=my.map(function(k){ var a=S.armies[k], q=E.armyQuality(S,a);
     return '<div class="card"><h3>'+esc(U.armyLabel(S,a))+' <span class="chip">'+statusJa(a.status)+'</span></h3><div class="small">'+esc(S.provinces[a.province].name)+(a.target?' → '+esc(a.target.type==='base'?S.bases[a.target.id].name:S.provinces[a.target.id].name):'')+'　士気'+Math.round(a.morale)+'　疲労'+Math.round(a.fatigue)+'　兵糧'+Math.floor(a.food/Math.max(1,a.troops*0.005))+'日分</div>'+
       '<table class="t" style="margin-top:4px"><tr><th>役</th><th>武将</th><th class="num">兵</th></tr>'+a.divisions.map(function(d){return '<tr><td>'+(d.main?'総大将（本隊）':'部隊大将')+'</td><td>'+esc(pnm(d.leader))+'</td><td class="num">'+fmt(d.troops)+'</td></tr>';}).join('')+'<tr><td>軍奉行</td><td>'+esc(a.bugyo?pnm(a.bugyo):'なし')+'</td><td></td></tr></table>'+
       '<div class="small muted">軍の質 '+Math.round(q.factor*100)+(q.notes.length?'：'+esc(q.notes.join('・')):'')+'</div>'+
-      '<div class="row"><button class="btn sm" data-move="'+k+'">進軍</button><button class="btn sub sm" data-org="'+k+'">編成</button><button class="btn sub sm" data-look="'+k+'">地図で見る</button><button class="btn sub sm" data-disband="'+k+'">解散</button>'+(S.armies[k].status!=='retreating'?'<button class="btn red sm" data-wd="'+k+'">退却</button>':'')+'</div></div>'; }).join('');
+      '<div class="row"><button class="btn sm" data-move="'+k+'">進軍</button><button class="btn sub sm" data-home="'+k+'">館に帰らせる</button><button class="btn sub sm" data-org="'+k+'">編成</button><button class="btn sub sm" data-look="'+k+'">地図で見る</button><button class="btn sub sm" data-disband="'+k+'">解散</button>'+(S.armies[k].status!=='retreating'?'<button class="btn red sm" data-wd="'+k+'">退却</button>':'')+'</div></div>'; }).join('');
   return h;
 };
 TABS.persons=function(f,fid){
@@ -1551,6 +1563,8 @@ function personCard(p){
 function bindLeft(){
   var q=function(id){return document.getElementById(id);};
   if(q('bRecOpen')) q('bRecOpen').onclick=function(){ openRecruit(null); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-rel]'),function(b){ b.onclick=function(){ run({type:'return_home',army:b.getAttribute('data-rel'),release:true}); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-home]'),function(b){ b.onclick=function(){ run({type:'return_home',army:b.getAttribute('data-home')}); }; });
   Array.prototype.forEach.call(document.querySelectorAll('[data-dg]'),function(c){ c.onchange=function(){ run({type:'delegate',key:c.getAttribute('data-dg'),on:c.checked}); }; });
   if(q('dgKeep')) q('dgKeep').onchange=function(){ run({type:'delegate',keep:+this.value||0}); };
   if(q('bPermit')) q('bPermit').onclick=function(){ run({type:'temple_permit'}); };
