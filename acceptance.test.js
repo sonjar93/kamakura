@@ -897,4 +897,35 @@ ok('90. 家の普請：力をつけた家は自ら新しい館を建てる', () 
   let started = false; for (let i = 0; i < 200 && !started; i++) { E.houseBuildTick(s); started = Object.values(s.constructions).some(c => c.house === h.id); } assert(started, '家の普請が始まる');
   const c = Object.values(s.constructions).find(c => c.house === h.id); c.progress = c.required; E.advanceDay(s); assert(Object.values(s.bases).some(b => b.house === h.id && /新館/.test(b.name)), '家の館になる');
 });
+ok('91. 委任は序盤の少ない銭でも動き、行ったことを記録する', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 7, mode: 'historical' }); E.issueCommand(s, { type: 'delegate', key: 'recruit', on: true });
+  for (let i = 0; i < 25; i++) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); }
+  assert(s.recruits.some(r => r.faction === 'yoritomo'), '徴兵が始まる'); assert((s.delegate.yoritomo.log || []).length > 0, '記録が残る');
+});
+ok('92. 銭の集め方：兵糧を売る・段銭（120日に一度）・市場の市銭', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); const f = s.factions.yoritomo; f.food = 3000; const m0 = f.money;
+  let r = E.issueCommand(s, { type: 'sell_food', amount: 300 }); assert(r.ok, r.reason); assert(f.money > m0 && f.food === 2700);
+  assert(!E.issueCommand(s, { type: 'sell_food', amount: 2600 }).ok, '200石は残す');
+  const hx = Object.values(s.holdings).find(x => x.province === 'izu'); hx.controller = 'yoritomo'; hx.house = null; const m1 = f.money; r = E.issueCommand(s, { type: 'levy' }); assert(r.ok, r.reason); assert(f.money > m1); assert(!E.issueCommand(s, { type: 'levy' }).ok, '120日に一度');
+  const h = Object.values(s.holdings).find(x => x.controller === 'yoritomo'); h.facilities = [{ kind: 'market', done: true }]; while (s.date.d !== 1) E.advanceDay(s); s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s);
+  while (s.date.d !== 1) { s.pendingStops.forEach(e => e.resolved = true); E.advanceDay(s); } assert(f.lastIncome.market >= 30, '市場の市銭が入る');
+});
+ok('93. 朝敵の赦免：京を30日押さえれば解け、都を追われた側が追討される。嘆願もでき、解ければ任官できる', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); const f = s.factions.yoritomo; f.status = '挙兵'; const rw = E.util.rel(s, 'yoritomo', 'heike'); rw.war = true; rw.status = '交戦'; E.issueTsuito(s, 'yoritomo', 'heike'); s.pendingStops.forEach(e => e.resolved = true);
+  assert(f.flags.choteki && f.chotekiSince === s.day); const cb = s.bases[s.court.location];
+  cb.owner = 'yoritomo'; for (let d = 0; d < 31; d++) { s.pendingStops.forEach(e => e.resolved = true); E.pardonTick(s); s.day++; }
+  assert(!f.flags.choteki, '京を押さえて赦免'); assert(s.factions.heike.flags.choteki, '都を追われた平家が追討される');
+  const s2 = E.createGame(scn, { playerFaction: 'yoritomo', seed: 3, mode: 'free' }); const g = s2.factions.yoritomo; E.issueTsuito(s2, 'yoritomo', 'heike'); g.money = 5000; let ok2 = false;
+  for (let i = 0; i < 40 && !ok2; i++) { g.pardonTry = null; g.money = 5000; const r = E.issueCommand(s2, { type: 'pardon_petition' }); assert(r.ok, r.reason); ok2 = !g.flags.choteki; } assert(ok2, '嘆願を重ねれば赦される');
+});
+ok('94. 拠点のない国：敵の拠点も軍もない国に大軍がとどまると敵方の所領を押さえ、朝敵の国衙領も押さえる', () => {
+  const s = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); const r = E.util.rel(s, 'yoritomo', 'heike'); r.war = true; r.status = '交戦';
+  const a = E.createArmy(s, 'yoritomo', 'owari', 2000, 'yoritomo', { food: 999 }); a.status = 'idle'; for (let d = 0; d < 5; d++) { E.seizeTick(s); s.day++; }
+  assert(Object.values(s.holdings).some(h => h.province === 'owari' && h.type === '国衙領' && h.controller === 'heike'), '朝敵でなければ国衙領は動かない');
+  s.factions.heike.flags.choteki = true; for (let d = 0; d < 5; d++) { E.seizeTick(s); s.day++; }
+  assert(Object.values(s.holdings).filter(h => h.province === 'owari' && h.type === '国衙領').every(h => h.controller === 'yoritomo'), '朝敵の国衙領を押さえる');
+  const s2 = E.createGame(scn, { playerFaction: 'yoritomo', seed: 2, mode: 'free' }); const r2 = E.util.rel(s2, 'yoritomo', 'heike'); r2.war = true; s2.factions.heike.flags.choteki = true;
+  const b = E.createArmy(s2, 'yoritomo', 'owari', 2000, 'yoritomo', { food: 999 }); b.status = 'idle'; const e = E.createArmy(s2, 'heike', 'owari', 500, null, { food: 999 }); e.status = 'idle';
+  for (let d = 0; d < 8; d++) { E.seizeTick(s2); s2.day++; } assert(Object.values(s2.holdings).some(h => h.province === 'owari' && h.controller === 'heike'), '敵軍がいれば押さえられない');
+});
 console.log(`\n${n} 件の受入条件をすべて満たした`);

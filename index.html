@@ -154,7 +154,7 @@ select,input,textarea{font:inherit;border:1px solid var(--line);border-radius:6p
 <body>
 <div id="app">
   <div id="top">
-    <span class="title">天下布武以前 ― 平安・鎌倉動乱記 <span id="verTag" style="font-size:11px;opacity:.7;font-weight:400">v2.9</span></span>
+    <span class="title">天下布武以前 ― 平安・鎌倉動乱記 <span id="verTag" style="font-size:11px;opacity:.7;font-weight:400">v2.12</span></span>
     <span id="date">—</span>
     <div class="seg" id="speed"><button data-s="0" class="on">⏸ 停止</button><button data-s="1">▶ 通常</button><button data-s="2">▶▶ 高速</button><button data-s="3">▶▶▶ 超高速</button></div>
     <button class="tbtn" id="step1">＋1日</button><button class="tbtn" id="stepM">月送り</button>
@@ -671,7 +671,7 @@ function render(fromTick){
   if(!S) return;
   $('date').textContent=U.dateStr(S);
   var pf=myF();
-  $('pf').innerHTML=(S.options.mode==='historical'?'<span class="chip gold">史実モード</span> ':'<span class="chip">自由モード</span> ')+'<span class="chip">'+esc((E.DIFFICULTY[S.options.difficulty||'normal']||{}).label||'')+'</span> '+(pf?fsw(pf.id)+esc(pf.name)+(S.player&&S.player.person&&S.persons[S.player.person]?' <span class="chip" title="操作人物">👤 '+esc(pnm(S.player.person))+(S.player.status&&S.player.status!=='在任'?'（'+esc(S.player.status)+'）':'')+'</span>':''):'観戦');
+  $('pf').innerHTML=(S.options.mode==='historical'?'<span class="chip gold">史実モード</span> ':'<span class="chip">自由モード</span> ')+'<span class="chip">'+esc((E.DIFFICULTY[S.options.difficulty||'normal']||{}).label||'')+'</span> '+(pf?'<span class="chip gold" id="moneyChip" title="毎月1日に年貢の銭が入る。自勢力タブの「銭を集める」で兵糧を売る・段銭など">💰 '+fmt(pf.money)+'貫'+(pf.lastIncome?'（月'+((pf.lastIncome.money-pf.lastIncome.upkeep)>=0?'+':'')+fmt(pf.lastIncome.money-pf.lastIncome.upkeep)+'）':'')+'</span> <span class="chip" title="兵糧">🌾 '+fmt(pf.food)+'石</span> ':'')+(pf?fsw(pf.id)+esc(pf.name)+(S.player&&S.player.person&&S.persons[S.player.person]?' <span class="chip" title="操作人物">👤 '+esc(pnm(S.player.person))+(S.player.status&&S.player.status!=='在任'?'（'+esc(S.player.status)+'）':'')+'</span>':''):'観戦');
   if($('tbUprise')) $('tbUprise').style.display=pf&&['雌伏','密謀'].indexOf(pf.status)>=0&&['yoritomo','kiso','kai'].indexOf(pf.id)>=0?'':'none';
   renderMap(); renderLeft(fromTick); if($('right').classList.contains('open')) renderRight(); ticker();
   if(sel&&sel.type==='army'&&!S.armies[sel.id]){ sel=null; hidePop(); }
@@ -1237,7 +1237,7 @@ TABS.history=function(f,fid){
 };
 TABS.faction=function(f,fid){
   var dg=(S.delegate||{})[fid]||{keep:500}, DG=E.DELEGATE;
-  var dcard='<div class="card" style="border-color:#4a6a9a"><h3>🗂 委任（自動で行う）</h3><div class="small muted">選んだことは家臣が裏で自動で行う（月の初めなど）。手元に残す銭より多い分だけ使う。</div>'+Object.keys(DG).map(function(k){return '<label class="small" style="display:block"><input type="checkbox" data-dg="'+k+'"'+(dg[k]?' checked':'')+'> '+esc(DG[k])+'</label>';}).join('')+'<div class="row small">手元に残す銭 <input type="number" id="dgKeep" value="'+(dg.keep==null?500:dg.keep)+'" step="100" min="0" style="width:80px">貫</div></div>';
+  var dcard='<div class="card" style="border-color:#4a6a9a"><h3>🗂 委任（自動で行う）</h3><div class="small muted">選んだことは家臣が裏で自動で行う（10日ごとに見回る。守りと論功行賞はすぐ）。手元に残す銭より多い分だけ使う。</div>'+Object.keys(DG).map(function(k){return '<label class="small" style="display:block"><input type="checkbox" data-dg="'+k+'"'+(dg[k]?' checked':'')+'> '+esc(DG[k])+'</label>';}).join('')+'<div class="row small">手元に残す銭 <input type="number" id="dgKeep" value="'+(dg.keep==null?200:dg.keep)+'" step="50" min="0" style="width:80px">貫　<span class="muted">（いまの銭 '+fmt(f.money)+'貫）</span></div>'+((dg.log||[]).length?'<div class="small" style="margin-top:4px"><b>最近の委任</b>'+dg.log.slice().reverse().map(function(x){return '<div class="muted">'+esc(x.date.replace(/（.*）/,''))+'：'+esc(x.text)+'</div>';}).join('')+'</div>':'<div class="small muted">10日ごとに見回る。行ったことはここと右のニュースに出る。</div>')+'</div>';
   if(!f) return '<div class="card">観戦モードです。</div>';
   var pw=U.factionPower(S,fid), h='';
   h+='<div class="card"><h3>'+fsw(fid)+esc(f.name)+'</h3><dl class="kv"><dt>状態</dt><dd>'+esc(f.status)+(f.flags.choteki?' <span class="chip red">朝敵</span>':'')+(f.flags.ryoji?' <span class="chip gold">令旨</span>':'')+(f.flags.bakufu?' <span class="chip gold">武家政権</span>':'')+'</dd><dt>当主</dt><dd>'+esc(pnm(f.leader))+'</dd><dt>本拠</dt><dd>'+esc(f.capital?S.bases[f.capital].name:'なし（流浪）')+'</dd>'+(f.overlord?'<dt>主君</dt><dd>'+esc(fnm(f.overlord))+'</dd>':'')+
@@ -1251,6 +1251,11 @@ TABS.faction=function(f,fid){
   if(['雌伏','密謀'].indexOf(f.status)>=0&&['yoritomo','kiso','kai'].indexOf(fid)>=0) h+='<div class="card"><h3>挙兵</h3><div class="small">'+(f.flags.ryoji?'令旨を受けており大義名分がある。':'<b>令旨をまだ受けていない</b>ため正当性は低い。')+'挙兵すると平家と交戦状態になる。</div><div class="row"><button class="btn red" data-act2="uprise">挙兵する</button></div></div>';
   h+='<div class="card"><h3>徴兵</h3><div class="small">所領・拠点のある国で兵を召し抱え、武士団を増やす。</div><div class="row"><button class="btn" id="bRecOpen">👥 徴兵する</button></div></div>';
   var pr=E.foodPrice(S);
+  var li=f.lastIncome||{}, mk=Object.keys(S.holdings).filter(function(k){var x=S.holdings[k];return x.controller===fid&&x.facilities&&x.facilities.some(function(y){return y.kind==='market'&&y.done;});}).length, lvW=f.lastLevy!=null&&S.day-f.lastLevy<120?120-(S.day-f.lastLevy):0;
+  h+='<div class="card" style="border-color:#c9a227"><h3>💰 銭を集める</h3><div class="small">いまの銭 <b>'+fmt(f.money)+'貫</b>　兵糧 <b>'+fmt(f.food)+'石</b><br>先月の収入：年貢の銭 '+fmt((li.money||0)-(li.market||0))+'貫'+(li.market?'・市場 '+fmt(li.market)+'貫':'')+'　軍の維持 −'+fmt(li.upkeep||0)+'貫／月（毎月1日に入る。年貢の米は9・10月にまとまって入る）</div>'+
+    '<div class="row"><input id="sellAmt" type="number" value="300" step="50" min="50" style="width:80px"> 石 <button class="btn" id="bSell">兵糧を売る</button><span class="small muted">相場の7割（1石 '+(Math.round(pr*0.7*100)/100)+'貫）。春夏は高く売れる</span></div>'+
+    '<div class="row"><button class="btn" id="bLevy"'+(lvW?' disabled':'')+'>段銭をかける</button><span class="small muted">直轄の所領の石高の2%を集める（120日に一度'+(lvW?'・あと'+lvW+'日':'')+'）。不穏が上がり、家臣の家の忠誠が少し下がる</span></div>'+
+    '<div class="small muted">ほかに：所領タブで所領に<b>市場</b>を建てる（毎月 30貫＋石高の0.5%。いま'+mk+'か所）、<b>開墾</b>で所領を増やす（普請タブ）、幕府を開いて<b>政所・公文所</b>を置くと年貢の銭が増える。委任の「兵糧の売却」で余った米を自動で銭に換えられる。</div></div>';
   h+='<div class="card"><h3>兵糧の購入</h3><div class="small">いまの相場：<b>'+pr+'</b>（平年＝1。収穫期の9〜11月は安く、端境期の4〜7月と飢饉の年は高い）'+(S.flags.famineUntil&&S.day<S.flags.famineUntil?' <span class="chip red">飢饉</span>':'')+'</div><div class="row"><input id="buyAmt" type="number" value="1000" style="width:90px"> 石 <button class="btn sub" id="bBuy">購入</button></div><div class="small muted">蔵の米は毎月1.5%ずつ傷む。軍への補給は補給線（味方の拠点から街道をたどる）が通じている国だけ。</div></div>';
   h+='<div class="card"><h3>寺社への寄進</h3><div class="row"><select id="donB">'+Object.keys(S.bases).filter(function(k){return S.bases[k].type==='寺社';}).map(function(k){return opt(k,S.bases[k].name);}).join('')+'</select><input id="donA" type="number" value="500" style="width:80px">貫 <button class="btn sub" id="bDon">寄進</button></div></div>';
   h=dcard+h;
@@ -1417,9 +1422,20 @@ function ninkanCard(f,fid){
   var lg=(N.log||[]).slice(-6).reverse(); if(lg.length) h+='<div style="margin-top:6px"><b class="small">近ごろの除目</b></div>'+lg.map(function(x){return '<div class="small"><span class="muted">'+esc(x.date.replace(/（.*）/,''))+'</span> '+esc(S.persons[x.person]?S.persons[x.person].name:'')+'：'+esc(x.office)+(x.why?'（'+esc(x.why)+'）':'')+'</div>';}).join('');
   return h+'</div>';
 }
+function chotekiCard(f,fid){
+  if(!f||!f.flags.choteki) return '';
+  var o=E.pardonOdds(S,fid), by=f.chotekiBy&&S.factions[f.chotekiBy]?fnm(f.chotekiBy):'朝廷', ks=f.kyotoSince!=null?S.day-f.kyotoSince:null, w=f.pardonTry!=null&&S.day-f.pardonTry<90?90-(S.day-f.pardonTry):0;
+  return '<div class="card" style="border-color:#8b1e1e"><h3>⚠ 朝敵とされている</h3><div class="small">'+esc(by)+'の求めで追討の宣旨が下ってから <b>'+o.years+'年</b>。朝敵のあいだは任官・国司の申請ができず、大義が下がり、諸国の武士が離れやすい。</div>'+
+    '<div class="small" style="margin-top:4px"><b>朝敵が解ける道</b>'+
+    '<div>・京（'+esc(S.bases[S.court.location].name)+'）を30日押さえる'+(o.capital?' <span class="chip">押さえている：'+(ks||0)+'／30日</span>':'')+'（都を追われた側が今度は追討される）</div>'+
+    '<div>・朝廷を動かす力（朝廷での支持）を得る：毎月25%で赦免</div>'+
+    '<div>・追討を求めた家が滅ぶか朝廷への力を失う'+(o.byGone?' <span class="chip">失っている</span>':'')+'：半年たてば毎月8%</div>'+
+    '<div>・3年たつ：毎月8%で院の意向により赦免</div></div>'+
+    '<div class="row" style="margin-top:6px"><button class="btn" id="bPardon"'+(w?' disabled':'')+'>赦免を嘆願する（献金300貫）</button><span class="small muted">見込み '+Math.round(o.p*100)+'%'+(w?'・あと'+w+'日':'・90日に一度')+'</span></div></div>';
+}
 TABS.court=function(f,fid){
   var c=S.court, pn=function(id){return id&&P(id)?esc(P(id).name)+(P(id).alive?'':'（故）'):'<span class="muted">空席／未設定</span>';};
-  var h=jokyoCard(f,fid)+ninkanCard(f,fid)+'<div class="card"><h3>朝廷</h3><dl class="kv"><dt>所在</dt><dd>'+esc(S.bases[c.location].name)+'</dd><dt>天皇</dt><dd>'+pn(c.emperor)+(c.gaiseki?' <span class="small muted">外戚：'+esc(fnm(c.gaiseki).replace(/（.*）/,''))+'</span>':'')+'</dd>'+(c.rivalEmperor&&P(c.rivalEmperor.person)&&P(c.rivalEmperor.person).alive?'<dt>都を離れた帝</dt><dd>'+pn(c.rivalEmperor.person)+(c.rivalEmperor.with?'（'+esc(fnm(c.rivalEmperor.with))+'のもと）':'')+'</dd>':'')+'<dt>院政</dt><dd>'+pn(c.cloisteredEmperor)+'</dd><dt>法皇</dt><dd>'+pn(c.dharmaEmperor)+(c.dharmaEmperorConfined?' <span class="chip red">幽閉中（院宣は出ない）</span>':'')+'</dd><dt>'+esc(c.regentTitle)+'</dt><dd>'+pn(c.regent)+'</dd><dt>左大臣</dt><dd>'+pn(c.ministers.sadaijin)+'</dd><dt>右大臣</dt><dd>'+pn(c.ministers.udaijin)+'</dd><dt>朝廷を主導</dt><dd>'+fsw(c.controller)+esc(fnm(c.controller))+'</dd></dl></div>';
+  var h=chotekiCard(f,fid)+jokyoCard(f,fid)+ninkanCard(f,fid)+'<div class="card"><h3>朝廷</h3><dl class="kv"><dt>所在</dt><dd>'+esc(S.bases[c.location].name)+'</dd><dt>天皇</dt><dd>'+pn(c.emperor)+(c.gaiseki?' <span class="small muted">外戚：'+esc(fnm(c.gaiseki).replace(/（.*）/,''))+'</span>':'')+'</dd>'+(c.rivalEmperor&&P(c.rivalEmperor.person)&&P(c.rivalEmperor.person).alive?'<dt>都を離れた帝</dt><dd>'+pn(c.rivalEmperor.person)+(c.rivalEmperor.with?'（'+esc(fnm(c.rivalEmperor.with))+'のもと）':'')+'</dd>':'')+'<dt>院政</dt><dd>'+pn(c.cloisteredEmperor)+'</dd><dt>法皇</dt><dd>'+pn(c.dharmaEmperor)+(c.dharmaEmperorConfined?' <span class="chip red">幽閉中（院宣は出ない）</span>':'')+'</dd><dt>'+esc(c.regentTitle)+'</dt><dd>'+pn(c.regent)+'</dd><dt>左大臣</dt><dd>'+pn(c.ministers.sadaijin)+'</dd><dt>右大臣</dt><dd>'+pn(c.ministers.udaijin)+'</dd><dt>朝廷を主導</dt><dd>'+fsw(c.controller)+esc(fnm(c.controller))+'</dd></dl></div>';
   var cl=c.cliques||{}, tot=Object.keys(cl).reduce(function(t,k){return t+cl[k].influence;},0)||1;
   h+='<div class="card"><h3>朝廷の派閥</h3><div class="small muted">影響力の大きい派閥ほど、任官・追討・院宣の審議を左右する。態度は史実上の傾き＋いまの状況（都の支配・正当性・朝敵）＋献金の恩で決まり、毎月少しずつ動く。</div>';
   Object.keys(cl).forEach(function(k){ var x=cl[k], a=fid?Math.round(E.cliqueAtt(S,x,fid)):null, ac=a==null?'':(a>=30?'ok':a<=-30?'ng':'');
@@ -1592,6 +1608,9 @@ function bindLeft(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-ando]'),function(b){ b.onclick=function(){ run({type:'ando',target:b.getAttribute('data-ando')}); }; });
   if(q('bHeir')) q('bHeir').onclick=function(){ if(q('heirSel').value) run({type:'set_heir',person:q('heirSel').value}); };
   Array.prototype.forEach.call(document.querySelectorAll('[data-rg]'),function(b){ b.onclick=function(){ run({type:'regime',action:b.getAttribute('data-rg')}); }; });
+  if(q('bPardon')) q('bPardon').onclick=function(){ run({type:'pardon_petition'}); };
+  if(q('bSell')) q('bSell').onclick=function(){ run({type:'sell_food',amount:+q('sellAmt').value}); };
+  if(q('bLevy')) q('bLevy').onclick=function(){ run({type:'levy'}); };
   if(q('bBuy')) q('bBuy').onclick=function(){ run({type:'buy_food',amount:+q('buyAmt').value}); };
   Array.prototype.forEach.call(document.querySelectorAll('[data-sp]'),function(b){ b.onclick=function(){ var id=b.getAttribute('data-sp'); run({type:'spoil',holding:id,to:document.querySelector('[data-spto="'+id+'"]').value}); }; });
   Array.prototype.forEach.call(document.querySelectorAll('[data-grant]'),function(b){ b.onclick=function(){ var id=b.getAttribute('data-grant'); run({type:'grant',holding:id,target:document.querySelector('[data-gto="'+id+'"]').value}); }; });
